@@ -15,10 +15,14 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.domain.cups import normalizar_cups
-from app.models import Anomalia, Factura, Suministro
-from app.schemas import AnomaliaActualizacion, AnomaliaOut
+from app.models import Anomalia, Cliente, EventoSync, Factura, Suministro
+from app.schemas import AnomaliaActualizacion, AnomaliaOut, TicketCreadoOut
+from app.services.hubspot import HubSpotError, obtener_cliente
 
 router = APIRouter(prefix="/anomalias", tags=["anomalias"])
+
+SISTEMA = "hubspot"
+OPERACION_TICKET = "ticket_anomalia"
 
 EstadoAnomalia = Literal["abierta", "resuelta", "descartada"]
 SeveridadAnomalia = Literal["alta", "media", "baja"]
@@ -67,3 +71,72 @@ def actualizar_anomalia(
     sesion.commit()
     sesion.refresh(anomalia)
     return AnomaliaOut.model_validate(anomalia, from_attributes=True)
+
+
+def _cups_de_anomalia(sesion: Session, anomalia: Anomalia) -> str:
+    """CUPS de la anomalía: el del suministro si está en cartera, o el de la factura."""
+    if anomalia.suministro_id is not None:
+        suministro = sesion.get(Suministro, anomalia.suministro_id)
+        if suministro is not None:
+            return suministro.cups
+    if anomalia.factura_id is not None:
+        factura = sesion.get(Factura, anomalia.factura_id)
+        if factura is not None:
+            return factura.cups_leido
+    return ""
+
+
+def _company_de_anomalia(sesion: Session, anomalia: Anomalia) -> str | None:
+    """Empresa de HubSpot del cliente del suministro, si la anomalía tiene suministro."""
+    if anomalia.suministro_id is None:
+        return None
+    return sesion.scalar(
+        select(Cliente.hubspot_company_id)
+        .join(Suministro, Suministro.cliente_id == Cliente.id)
+        .where(Suministro.id == anomalia.suministro_id)
+    )
+
+
+@router.post("/{anomalia_id}/ticket", response_model=TicketCreadoOut)
+def crear_ticket(
+    anomalia_id: int, sesion: Annotated[Session, Depends(get_session)]
+) -> TicketCreadoOut:
+    """Crea el ticket en HubSpot de la anomalía, o devuelve el que ya existía.
+
+    Idempotente: primero mira el `hubspot_ticket_id` guardado y después el servicio
+    busca por `energy_ops_id`, así que repetir la llamada nunca duplica tickets.
+    """
+    anomalia = sesion.get(Anomalia, anomalia_id)
+    if anomalia is None:
+        raise HTTPException(status_code=404, detail="Anomalía no encontrada")
+    existente = anomalia.hubspot_ticket_id
+    if existente is not None:
+        return TicketCreadoOut(anomalia_id=anomalia.id, hubspot_ticket_id=existente, creado=False)
+    try:
+        ticket_id = obtener_cliente().crear_ticket_anomalia(
+            anomalia, _cups_de_anomalia(sesion, anomalia), _company_de_anomalia(sesion, anomalia)
+        )
+    except HubSpotError as exc:
+        sesion.add(
+            EventoSync(
+                sistema=SISTEMA,
+                operacion=OPERACION_TICKET,
+                entidad_id=str(anomalia.id),
+                ok=False,
+                detalle={"error": str(exc)},
+            )
+        )
+        sesion.commit()
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    anomalia.hubspot_ticket_id = ticket_id
+    sesion.add(
+        EventoSync(
+            sistema=SISTEMA,
+            operacion=OPERACION_TICKET,
+            entidad_id=str(anomalia.id),
+            ok=True,
+            detalle={"hubspot_ticket_id": ticket_id},
+        )
+    )
+    sesion.commit()
+    return TicketCreadoOut(anomalia_id=anomalia.id, hubspot_ticket_id=ticket_id, creado=True)

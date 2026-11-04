@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     hs_stage_pendiente: str = ""
     hs_ticket_pipeline: str = ""
     hs_ticket_stage_nuevo: str = ""
+    # Fase de negocio en HubSpot → estado de suministro, escrita como JSON (p. ej.
+    # HS_MAPA_ESTADOS='{"pendiente-doc":"pendiente","en-tramite":"en_tramite"}').
+    hs_mapa_estados: dict[str, str] = {}
 
     # n8n
     n8n_encryption_key: str = ""
