@@ -1,0 +1,21 @@
+{
+  "cups": "ES0031000000000024NJ",
+  "numero_factura": "ECO-202610-000",
+  "comercializadora": "Ecoflux",
+  "fecha_emision": "2026-11-04",
+  "fecha_inicio": "2026-10-01",
+  "fecha_fin": "2026-10-31",
+  "potencia_kw": 24.0,
+  "consumo_kwh": 3859.23,
+  "importe_potencia": 20.82,
+  "importe_energia": 201.53,
+  "impuestos_otros": 47.42,
+  "importe_total": 269.77,
+  "lectura_estimada": false,
+  "confianza": 1.0,
+  "campos_dudosos": [],
+  "anomalias_esperadas": [
+    "R6"
+  ],
+  "tipo_anomalia": "consumo_disparado"
+}

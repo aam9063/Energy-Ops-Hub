@@ -1,0 +1,19 @@
+{
+  "cups": "ES0022000000000029PQ",
+  "numero_factura": "LUM-202606-005",
+  "comercializadora": "Luminar Comercializadora",
+  "fecha_emision": "2026-07-06",
+  "fecha_inicio": "2026-06-01",
+  "fecha_fin": "2026-06-30",
+  "potencia_kw": 45.0,
+  "consumo_kwh": 5628.07,
+  "importe_potencia": 57.73,
+  "importe_energia": 657.75,
+  "impuestos_otros": 194.51,
+  "importe_total": 909.99,
+  "lectura_estimada": false,
+  "confianza": 1.0,
+  "campos_dudosos": [],
+  "anomalias_esperadas": [],
+  "tipo_anomalia": null
+}

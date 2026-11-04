@@ -1,0 +1,21 @@
+{
+  "cups": "ES0031000000000900GS",
+  "numero_factura": "VOL-202608-015",
+  "comercializadora": "Voltia Energía",
+  "fecha_emision": "2026-09-03",
+  "fecha_inicio": "2026-08-01",
+  "fecha_fin": "2026-08-31",
+  "potencia_kw": 4.6,
+  "consumo_kwh": 438.14,
+  "importe_potencia": 13.08,
+  "importe_energia": 70.92,
+  "impuestos_otros": 23.81,
+  "importe_total": 107.81,
+  "lectura_estimada": false,
+  "confianza": 1.0,
+  "campos_dudosos": [],
+  "anomalias_esperadas": [
+    "R2"
+  ],
+  "tipo_anomalia": "cups_fuera_cartera"
+}

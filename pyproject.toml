@@ -21,6 +21,7 @@ dev = [
     "pre-commit>=4.0",
     "pytest>=8.3",
     "pytest-cov>=6.0",
+    "reportlab>=5.1.0",
     "respx>=0.22",
     "ruff>=0.8",
 ]
@@ -53,6 +54,9 @@ quote-style = "double"
 [tool.mypy]
 python_version = "3.12"
 files = ["app", "scripts", "tests"]
+# scripts/ es un namespace package (sin __init__.py): sin esta opción mypy resuelve
+# scripts/seed.py como "seed" y "scripts.seed" a la vez y aborta.
+explicit_package_bases = true
 check_untyped_defs = true
 disallow_untyped_defs = true
 no_implicit_optional = true
@@ -62,7 +66,7 @@ warn_return_any = true
 show_error_codes = true
 
 [[tool.mypy.overrides]]
-module = ["pdfplumber.*", "anthropic.*"]
+module = ["pdfplumber.*", "anthropic.*", "reportlab.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
