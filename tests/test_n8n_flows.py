@@ -194,3 +194,28 @@ class TestEndpointsPorFlujo:
         flujo = json.loads(FLUJOS[clave].read_text(encoding="utf-8"))
         tipos = [nodo["type"] for nodo in flujo["nodes"]]
         assert any(tipo in t for t in tipos), f"{clave} no tiene ningún nodo {tipo!r}"
+
+
+@pytest.mark.parametrize("ruta", FLUJOS.values(), ids=lambda p: p.name)
+def test_los_nodos_http_reintentan_y_avisan_del_fallo(ruta: Path) -> None:
+    """Un fallo de red no puede detener el flujo en silencio (hallazgo R4 del RDD de la 09).
+
+    Cada nodo HTTP reintenta, y cuando se agotan los intentos entrega el ítem por su salida de
+    error, que tiene que estar conectada a un nodo existente (el aviso al responsable).
+    """
+    flujo = json.loads(ruta.read_text(encoding="utf-8"))
+    nombres = {nodo["name"] for nodo in flujo["nodes"]}
+    http = [nodo for nodo in flujo["nodes"] if nodo["type"].endswith("httpRequest")]
+    assert http, f"{ruta.name} no tiene ningún nodo HTTP"
+
+    for nodo in http:
+        assert nodo.get("retryOnFail") is True, f"{nodo['name']} no reintenta"
+        assert int(nodo.get("maxTries", 0)) >= 2, f"{nodo['name']} reintenta demasiado poco"
+        assert nodo.get("onError") == "continueErrorOutput", (
+            f"{nodo['name']} corta el flujo al fallar"
+        )
+        salidas = flujo["connections"][nodo["name"]]["main"]
+        assert len(salidas) >= 2, f"{nodo['name']} no declara salida de error"
+        assert salidas[1], f"{nodo['name']} no tiene rama de error conectada"
+        for conexion in salidas[1]:
+            assert conexion["node"] in nombres

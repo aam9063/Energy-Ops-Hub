@@ -7,7 +7,10 @@
       "name": "Nota del flujo F3",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-620, -280],
+      "position": [
+        -620,
+        -280
+      ],
       "parameters": {
         "content": "## F3 · Sincronización con HubSpot\nCada 15 minutos llama a `POST $vars.API_URL + /sync/hubspot` (sincronización incremental de fases). Si el resumen de la respuesta trae `errores > 0`, avisa por email. La lógica de sincronización y de idempotencia vive toda en Python; n8n solo dispara y avisa. Un error HTTP de la API rompe la ejecución y lo recoge el flujo de errores configurado en n8n.",
         "height": 220,
@@ -19,7 +22,10 @@
       "name": "Nota · Credenciales y variables",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-620, -40],
+      "position": [
+        -620,
+        -40
+      ],
       "parameters": {
         "content": "## Credenciales y variables\nEste flujo NO lleva credenciales embebidas: se configuran en n8n, no en este JSON. La autenticación con HubSpot vive en la API, no aquí.\n\nVariables de n8n (Settings → Variables): `API_URL`, `API_KEY`, `RESPONSABLE_EMAIL`.\n\nCredenciales: el nodo de Gmail que avisa usa la credencial de Gmail del remitente de operaciones; conéctala en n8n tras importar el flujo.",
         "height": 220,
@@ -31,7 +37,10 @@
       "name": "Cada 15 minutos",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [-380, 0],
+      "position": [
+        -380,
+        0
+      ],
       "parameters": {
         "rule": {
           "interval": [
@@ -48,7 +57,10 @@
       "name": "Sincronizar HubSpot",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-160, 0],
+      "position": [
+        -160,
+        0
+      ],
       "parameters": {
         "method": "POST",
         "url": "={{ $vars.API_URL }}/sync/hubspot",
@@ -62,14 +74,21 @@
           ]
         },
         "options": {}
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
     },
     {
       "id": "88888888-aaaa-4b02-9b02-000000000003",
       "name": "¿Sync con errores?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [60, 0],
+      "position": [
+        60,
+        0
+      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -100,7 +119,10 @@
       "name": "Avisar del fallo de sincronización",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [280, 0],
+      "position": [
+        280,
+        0
+      ],
       "parameters": {
         "sendTo": "={{ $vars.RESPONSABLE_EMAIL }}",
         "subject": "Sync HubSpot con errores",
@@ -129,6 +151,13 @@
         [
           {
             "node": "¿Sync con errores?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar del fallo de sincronización",
             "type": "main",
             "index": 0
           }
