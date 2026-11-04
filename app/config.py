@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     # Autenticación de la demo: cabecera X-API-Key. Vacío = API abierta (solo en local).
     api_key: str = ""
 
-    # Extracción con LLM (feature 04)
-    anthropic_api_key: str = ""
-    anthropic_model: str = ""
+    # Extracción con LLM (feature 04). Proveedor OpenAI con Structured Outputs.
+    openai_api_key: str = ""
+    openai_model: str = ""
 
     # HubSpot (feature 07)
     hubspot_token: str = ""
