@@ -109,6 +109,51 @@ reales exigen `OPENAI_API_KEY` y el merge `dev`→`main` es del humano.
 - **R4 sobre una duplicada** se cuenta aparte (`secundarias_r4`) y no como falsa alarma, que es lo
   que decidió la feature 05 al inyectar los datos.
 
+## Resultados con la clave real (`gpt-4.1-mini`, 120 facturas)
+
+| Campo | Precisión |
+|---|---:|
+| CUPS | 100,0 % |
+| Número de factura | 100,0 % |
+| Comercializadora | 100,0 % |
+| Periodo (inicio y fin) | 100,0 % |
+| Consumo kWh | 100,0 % |
+| Importe total | 100,0 % |
+| Lectura estimada | 100,0 % |
+
+| Detección de anomalías | Valor |
+|---|---:|
+| Recall (18 inyectadas) | **18/18 (100 %)** |
+| Falsas alarmas | 10 |
+| Coste medio por factura | 0,0007 € |
+| Tokens medios | 1142 entrada / 139 salida |
+
+Las 10 falsas alarmas son **9 de R5 y 1 de R11**, y conviene contarlas bien: R5 marca facturas cuyos
+conceptos no suman el total y en esos casos el modelo leyó algún concepto con ±1 € de error (más dos
+casos de 9-11 €). R5 no se equivoca: avisa de ruido de extracción. R11 marca una factura que el
+modelo declaró con confianza baja. Ambas son alertas útiles, no defectos de la regla.
+
+## Iteración: qué cambió entre mediciones
+
+| Medición | Cambio | Campos | Recall | Falsas alarmas |
+|---|---|---|---:|---:|---:|
+| 1 | primera, con la clave real | comercializadora 20 % | 15/18 | 72 |
+| 2 | comparador sin forma jurídica + prompt con la regla del IVA | **7/7 al 100 %** | 15/18 | 12 |
+| 3 | orden de ingesta y coste por id base | 7/7 | 15/18 | 11 |
+| 4 | duplicados como reenvío real (archivo distinto) | 7/7 | **18/18** | 10 |
+
+Lo que enseñó cada paso, que es lo que vale para la entrevista:
+
+1. **El primer número era malo y el culpable era la medición, no el modelo**: «Voltia Energía, S.L.»
+   frente a «Voltia Energía» tumbaba el 80 % de la precisión de un campo. Un comparador que no
+   normaliza miente.
+2. **R5 con 64 falsas alarmas destapó un problema del prompt**: el modelo devolvía conceptos sin IVA y
+   el total con IVA. Con la regla explícita, esas alarmas cayeron a 9.
+3. **R3 a 0 no era un fallo de la regla**: el PDF del duplicado era byte a byte idéntico al original,
+   así que su hash coincidía y R3 hacía bien en tratarlo como idempotencia. El fallo estaba en el
+   **dataset**: un duplicado real es un reenvío, otro archivo con los mismos datos.
+4. **Con el dataset realista, recall 18/18**: R3 detecta los tres duplicados.
+
 ## RDD
 
 - Riesgo: **alto** (el proveedor detectó el shell del workflow de evals) · Lente: `reliability` ·
