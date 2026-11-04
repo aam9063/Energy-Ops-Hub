@@ -1,4 +1,5 @@
-"""Aplicación FastAPI: middleware de API key, `/health` y endpoints de facturas."""
+"""Aplicación FastAPI: middleware de API key, `/health` y endpoints de facturas,
+anomalías y tareas programadas."""
 
 import logging
 import secrets
@@ -12,7 +13,9 @@ from starlette.types import ASGIApp
 
 from app.config import Settings, settings
 from app.db import engine
+from app.routers.anomalias import router as anomalias_router
 from app.routers.facturas import router as facturas_router
+from app.routers.tareas import router as tareas_router
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +64,11 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
         summary="Automatización de operaciones energéticas para carteras inmobiliarias",
     )
     aplicacion.add_middleware(ApiKeyMiddleware, api_key=configuracion.api_key)
-    # El middleware de X-API-Key también protege /facturas: no es ruta pública.
+    # El middleware de X-API-Key también protege /facturas, /anomalias y /tareas:
+    # no son rutas públicas.
     aplicacion.include_router(facturas_router)
+    aplicacion.include_router(anomalias_router)
+    aplicacion.include_router(tareas_router)
 
     @aplicacion.get("/health", tags=["sistema"])
     def health() -> JSONResponse:

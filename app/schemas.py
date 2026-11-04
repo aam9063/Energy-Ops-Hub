@@ -7,6 +7,7 @@ debe rellenar (Structured Outputs) y el que valida su salida. `AnomaliaOut`, `Fa
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -54,11 +55,31 @@ class AnomaliaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    factura_id: int | None
+    suministro_id: int | None
     regla: str
     severidad: str
     detalle: str
     estado: str
     creado_en: datetime
+
+
+class AnomaliaActualizacion(BaseModel):
+    """Cuerpo de `PATCH /anomalias/{id}`: cerrar la anomalía con un comentario.
+
+    Solo se permite pasar a `resuelta` o `descartada` (cualquier otro estado, incluida
+    `abierta`, se rechaza con 422 en la validación). El comentario es obligatorio y queda
+    añadido a `detalle` como trazabilidad.
+    """
+
+    estado: Literal["resuelta", "descartada"] = Field(description="Nuevo estado de la anomalía")
+    comentario: str = Field(min_length=1, description="Motivo del cierre; se añade a `detalle`")
+
+
+class TareaSinFacturarOut(BaseModel):
+    """Respuesta de `POST /tareas/sin-facturar`: cuántas anomalías R10 creó."""
+
+    anomalias_creadas: int
 
 
 class FacturaOut(BaseModel):
