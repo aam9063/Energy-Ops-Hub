@@ -51,7 +51,7 @@ Cita literal de `docs/spec.md`, sección 10:
 - [x] T5 `GET /anomalias` con filtros `estado`, `severidad`, `cups` y `PATCH /anomalias/{id}` para
   resolver o descartar con comentario
 - [x] T6 tests: cada regla con un caso que dispara y otro que no, y la evaluación conjunta
-- [ ] T7 verificación, evidencia, RDD (riesgo medio, una lente), PR y merge
+- [x] T7 verificación, evidencia, RDD (riesgo medio, una lente), PR y merge
 
 ## Criterios de aceptación
 
@@ -127,4 +127,12 @@ T7: RDD (riesgo medio, una lente), PR a `dev` y merge. Después, feature 06 (`06
 
 ## RDD
 
-- (pendiente)
+- Riesgo: **medio** · Lente: `reliability` · Resultado: **aprobado** · Lineage
+  `review-2c0c28b3ee26dd65`, 10 archivos y 1932 líneas.
+- **Primer intento mal acotado y descartado sin quemar autoridad**: al pasar `dev` como base, el
+  proveedor resolvió al merge-base e incluyó la feature 04 ya revisada (21 archivos, 3289 líneas).
+  Se rehizo sobre el commit exacto de `dev` (`87888e6`), y el candidato quedó en los 10 archivos de
+  esta feature.
+- Aviso informativo `R3-sug-cron-determinism`: el reloj entra en R10 con `date.today()`. Está
+  documentado en `Decisiones` y la firma ya admite `dias`; si algún día se quiere congelar el
+  calendario, la fecha se inyecta y el test no cambia de semántica.
