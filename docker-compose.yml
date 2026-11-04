@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ops
+      POSTGRES_PASSWORD: ops
+      POSTGRES_DB: energy_ops
+    ports: ["5432:5432"]
+    volumes: [dbdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ops -d energy_ops"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://ops:ops@db:5432/energy_ops
+      API_KEY: ${API_KEY:-dev-key}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports: ["8000:8000"]
+
+  n8n:
+    image: n8nio/n8n
+    ports: ["5678:5678"]
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-cambia-esta-clave-en-local}
+      GENERIC_TIMEZONE: Europe/Madrid
+    volumes: [n8ndata:/home/node/.n8n]
+
+volumes:
+  dbdata:
+  n8ndata:
