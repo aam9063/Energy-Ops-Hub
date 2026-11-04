@@ -36,7 +36,7 @@ Cita literal de `docs/spec.md`, sección 22:
 - [x] T7 `scripts/seed.py` con clientes y suministros de ejemplo
 - [x] T8 pre-commit con ruff, hooks básicos y gitleaks
 - [x] T9 verificación completa y evidencia
-- [ ] T10 RDD del candidato, PR a `dev`, merge y limpieza
+- [x] T10 RDD del candidato, PR a `dev`, merge y limpieza
 
 ## Criterios de aceptación
 
@@ -84,12 +84,14 @@ Cita literal de `docs/spec.md`, sección 22:
 
 ## Siguiente paso
 
-T10: revisión RDD del candidato, PR a `dev` y merge. Después, feature 02 (`02-pipeline-ci`).
+Feature 02 (`02-pipeline-ci`): `ci.yml` con el job agregador `ci-ok`, `dependabot.yml`, plantilla
+de PR y, tras el merge, protección de `main` y `dev`. Antes de empezarla hace falta el scope
+`workflow` del token de `gh`.
 
 ## Git
 
 - Rama: `feat/01-base-proyecto`
-- PR: (pendiente)
+- PR: #1 (`feat/01-base-proyecto` → `dev`)
 
 ## Decisiones
 
