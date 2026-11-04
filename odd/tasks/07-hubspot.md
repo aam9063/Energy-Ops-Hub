@@ -50,7 +50,7 @@ Cita literal de `docs/spec.md`, sección 12:
 - [x] T7 auditoría en `eventos_sync` de cada operación con HubSpot, sin datos personales
 - [x] T8 tests con `respx`: dos upserts no duplican, 429 se reintenta, se asocia a la empresa,
   el sync no retrocede estados y un error de HubSpot no pierde la fila local
-- [ ] T9 verificación, evidencia, RDD (riesgo alto, 4 lentes), PR y merge
+- [x] T9 verificación, evidencia, RDD, PR y merge
 
 ## Criterios de aceptación
 
@@ -129,4 +129,22 @@ su `/altas/lote`).
 
 ## RDD
 
-- (pendiente)
+- **Primera revisión** (4 lentes: `risk`, `resilience`, `readability`, `reliability`, lineage
+  `review-1f816bca02a6389e`): 4 revisores capturados y **refuter ejecutado**. La revisión **no
+  aprobó**: quedó **escalada** con un hallazgo corroborado
+  (`R3-reliability-crash-null-desde`, `app/services/hubspot_sync.py:66-67`) y causalidad
+  desconocida sobre `R2-001`. Sin aprobación no hay merge.
+- **Corrección**: la comparación `fecha_negocio < suministro.estado_desde` reventaba con
+  `TypeError` si `estado_desde` era nulo (fila antigua o creada fuera del ORM) o si un extremo
+  llevaba zona horaria y el otro no, y ese `TypeError` abortaba la sincronización entera. Se extrajo
+  `respuesta_vieja()` con guardas explícitas —una fecha ausente o incomparable no impide aplicar la
+  fase nueva— y se fijó con dos tests puros: extremos ausentes/incomparables y la comparación real
+  (más antigua → `True`, más nueva o igual → `False`). 152 tests en la suite.
+- **Segunda revisión** del candidato corregido (lineage `review-fde0e0777759eecc`): lentes
+  `resilience` y `reliability`, las pertinentes al cambio; `risk` y `readability` ya se habían
+  revisado sobre el código que no cambió. Resultado: **aprobado**, con seis avisos informativos
+  (`app/routers/altas.py:73-77`, `app/services/hubspot.py:82-98`, `app/config.py:33`,
+  `app/services/hubspot_sync.py:66` y `:107`, `app/services/hubspot.py:60`), ninguno bloqueante.
+- **Lección para las siguientes features**: un refuter que corrobora un fallo convierte la revisión
+  en un trabajo, no en un trámite. El coste de arreglarlo y volver a revisar es menor que el de
+  mergear un crash conocido.
