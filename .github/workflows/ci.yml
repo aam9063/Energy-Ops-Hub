@@ -50,7 +50,7 @@ jobs:
       DATABASE_URL: postgresql+psycopg://ops:ops@localhost:5432/energy_ops_test
       API_KEY: ci-test-key
       # Los tests nunca llaman a servicios reales: van simulados.
-      ANTHROPIC_API_KEY: ci-dummy
+      OPENAI_API_KEY: ci-dummy
       HUBSPOT_TOKEN: ci-dummy
     steps:
       - uses: actions/checkout@v7

@@ -8,3 +8,6 @@ y así los tests no dependen del `.env` de cada desarrollador (que dentro de Doc
 import os
 
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://ops:ops@localhost:5432/energy_ops")
+# Los tests de la API no deben depender de si el entorno trae una clave: el middleware se
+# prueba aparte, inyectando `Settings(api_key=...)` en `create_app` (tests/test_health.py).
+os.environ["API_KEY"] = ""
