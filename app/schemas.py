@@ -112,3 +112,63 @@ class FacturaSubidaOut(FacturaOut):
     """Respuesta de `POST /facturas`: la factura, sus anomalías y si se ha creado ahora."""
 
     creada: bool
+
+
+class FilaAlta(BaseModel):
+    """Una fila del lote de altas (`POST /altas/lote`)."""
+
+    nif: str = Field(description="NIF del cliente al que pertenece el suministro")
+    cups: str = Field(description="CUPS, se normaliza y valida con las letras de control")
+    tipo: str = Field(description="Tipo de suministro: luz, gas o agua")
+    direccion: str = Field(description="Dirección del punto de suministro")
+    tarifa_acceso: str | None = None
+    potencia_kw: Decimal | None = None
+
+
+class ResultadoFila(BaseModel):
+    """Resultado de una fila del lote: ok con el negocio, o fallo con mensaje."""
+
+    fila: int = Field(description="Posición de la fila en el lote, empezando en 1")
+    ok: bool
+    cups: str | None = None
+    hubspot_deal_id: str | None = None
+    mensaje: str | None = None
+
+
+class ResumenLote(BaseModel):
+    """Recuento del lote: recibidas, creadas, actualizadas y con error."""
+
+    recibidas: int
+    creadas: int
+    actualizadas: int
+    errores: int
+
+
+class AltaLoteIn(BaseModel):
+    """Cuerpo de `POST /altas/lote`: filas de altas, normalmente de una hoja de cálculo."""
+
+    filas: list[FilaAlta]
+
+
+class AltaLoteOut(BaseModel):
+    """Respuesta de `POST /altas/lote`: resultado por fila y resumen (sección 15)."""
+
+    resultados: list[ResultadoFila]
+    resumen: ResumenLote
+
+
+class TicketCreadoOut(BaseModel):
+    """Respuesta de `POST /anomalias/{id}/ticket`: el ticket, creado ahora o ya existente."""
+
+    anomalia_id: int
+    hubspot_ticket_id: str
+    creado: bool
+
+
+class SyncResumenOut(BaseModel):
+    """Respuesta de `POST /sync/hubspot`: recuento de negocios revisados."""
+
+    revisados: int
+    actualizados: int
+    omitidos: int
+    errores: int
