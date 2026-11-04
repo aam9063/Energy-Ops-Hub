@@ -56,7 +56,7 @@ quote-style = "double"
 
 [tool.mypy]
 python_version = "3.12"
-files = ["app", "scripts", "tests"]
+files = ["app", "scripts", "tests", "evals"]
 # scripts/ es un namespace package (sin __init__.py): sin esta opción mypy resuelve
 # scripts/seed.py como "seed" y "scripts.seed" a la vez y aborta.
 explicit_package_bases = true

@@ -1,0 +1,51 @@
+name: Evals LLM
+
+# Las evals llaman al LLM real y cuestan dinero: son manuales (workflow_dispatch) y viven
+# en su propio environment `evals`, con la clave y el modelo entre sus secrets y vars.
+on:
+  workflow_dispatch:
+    inputs:
+      limite:
+        description: "Número máximo de facturas a evaluar"
+        required: true
+        default: "30"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evals
+  cancel-in-progress: false
+
+jobs:
+  evals:
+    name: evals
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: evals
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      LIMITE: ${{ inputs.limite }} # el input pasa por env, nunca interpolado en el script
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Generar el dataset sintético
+        run: uv run python -m scripts.generate_invoices
+      - name: Ejecutar evals
+        run: uv run python -m evals.run_evals --limite "$LIMITE" --salida evals/resultados.md
+      - name: Publicar resultados en el resumen
+        if: always()
+        run: |
+          if [ -f evals/resultados.md ]; then
+            cat evals/resultados.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: evals-resultados
+          path: evals/resultados.md
+          if-no-files-found: warn
