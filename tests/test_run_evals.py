@@ -31,6 +31,7 @@ from evals.run_evals import (
     generar_informe,
     main,
     normalizar_texto,
+    precio_del_modelo,
     precision_por_campo,
     precision_por_comercializadora,
     suministros_de_cartera,
@@ -522,3 +523,35 @@ def test_ejecucion_completa_escribe_el_informe(
     assert "| CUPS | 1 | 1 | 100,0 % |" in informe
     assert "- Coste medio por factura: 0,0001 €" in informe  # (500·0.15 + 100·0.6) / 1M
     assert "| Detectadas (recall) | 0/0 (—) |" in informe
+
+
+@pytest.mark.parametrize(
+    ("esperado", "extraido", "coincide"),
+    [
+        ("Voltia Energía", "Voltia Energía, S.L.", True),
+        ("Luminar Comercializadora", "Luminar Comercializadora, S.A.", True),
+        ("Ecoflux", "ECOFLUX", True),
+        ("Voltia Energía", "Voltia Energia", True),
+        ("Voltia Energía", "Luminar Comercializadora", False),
+    ],
+)
+def test_la_comercializadora_se_compara_sin_forma_juridica(
+    esperado: str, extraido: str, coincide: bool
+) -> None:
+    """«Voltia Energía, S.L.» y «Voltia Energía» son la misma comercializadora.
+
+    La factura lleva la forma jurídica y la cartera no; comparar el texto crudo hacía que la
+    extracción pareciera fallar al 80 % cuando estaba leyendo bien.
+    """
+    verdad = _factura(comercializadora=esperado)
+    extraccion = _factura(comercializadora=extraido)
+
+    assert comparar_campo("comercializadora", verdad, extraccion) is coincide
+
+
+def test_el_precio_se_encuentra_por_el_id_con_fecha() -> None:
+    """La API devuelve `gpt-4.1-mini-2025-04-14`; la tabla de precios está por nombre."""
+    precios = run_evals.tabla_de_precios()
+
+    assert precio_del_modelo("gpt-4.1-mini-2025-04-14", precios) == precios["gpt-4.1-mini"]
+    assert precio_del_modelo("modelo-inexistente", precios) is None
