@@ -144,6 +144,12 @@ def test_la_duplicada_es_el_mismo_documento_que_su_original(dataset: Path) -> No
         assert duplicada["fecha_fin"] == original["fecha_fin"]
         assert duplicada["fecha_emision"] == original["fecha_emision"]
         assert duplicada["importe_total"] == original["importe_total"]
+    # Y son archivos distintos: si compartieran bytes, el hash las haría idempotentes y R3 no
+    # podría ver el duplicado.
+    pdfs = {
+        ruta.stem: hashlib.sha256(ruta.read_bytes()).hexdigest() for ruta in dataset.glob("*.pdf")
+    }
+    assert pdfs["lum-202605-004"] != pdfs["lum-202605-004-duplicada"]
 
 
 def test_las_fechas_de_emision_son_plausibles(dataset: Path) -> None:
