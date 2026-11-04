@@ -59,11 +59,11 @@ y `dev`, y once features integradas con su documento ODD y su resultado RDD.
 
 ## Checklist
 
-- [ ] T1 `README.md` con la estructura de la sección 23 y los números medidos
-- [ ] T2 `docs/arquitectura.md` con el diagrama de la sección 4 y el reparto de responsabilidades
-- [ ] T3 los siete ADR de la sección 23 en `docs/adr/`
-- [ ] T4 `docs/demo.md` con el guion de tres minutos de la sección 24
-- [ ] T5 verificación (enlaces internos, comandos del README, números contra `evals/resultados.md`)
+- [x] T1 `README.md` con la estructura de la sección 23 y los números medidos
+- [x] T2 `docs/arquitectura.md` con el diagrama de la sección 4 y el reparto de responsabilidades
+- [x] T3 los siete ADR de la sección 23 en `docs/adr/`
+- [x] T4 `docs/demo.md` con el guion de tres minutos de la sección 24
+- [x] T5 verificación (enlaces internos, comandos del README, números contra `evals/resultados.md`)
 - [ ] T6 PR a `dev` y merge
 
 ## Criterios de aceptación
@@ -77,15 +77,33 @@ y `dev`, y once features integradas con su documento ODD y su resultado RDD.
 
 ## Evidencia
 
-- (pendiente)
+- **T1 README**: reescrito con la estructura de la sección 23. Abre con el problema de Laura y no
+  con la tecnología, y los números son los medidos: 7 campos al 100 %, recall 18/18, 10 falsas
+  alarmas (9 de R5 por ruido de extracción y 1 de R11), 0,0007 € por factura, **219 tests** y
+  cobertura del **97 %** sobre `app/`. Las métricas de ahorro van como estimaciones con supuestos
+  explícitos (4 minutos por factura, 500 facturas/mes).
+- **T2** `docs/arquitectura.md` con el diagrama Mermaid de la sección 4 y el reparto de
+  responsabilidades (Python decide, n8n orquesta, Apps Script es la interfaz).
+- **T3** los siete ADR de la sección 23 en `docs/adr/`, de media página cada uno.
+- **T4** `docs/demo.md` con el guion de tres minutos y la lista de comprobación previa a grabar.
+- **Verificación**: script propio sobre todos los `.md` nuevos → **0 enlaces internos rotos**; los
+  cinco comandos de arranque son los que existen en el repo (`cp .env.example .env`,
+  `docker compose up -d`, `uv sync`, `uv run alembic upgrade head`, `uv run python -m scripts.seed`);
+  `uv run pytest -q` → 219 passed.
+- **Nota de proceso**: el worker escribió estos archivos mientras la rama activa era la de las
+  correcciones de evals, así que la documentación entró en el PR #13. Reescribir esa rama exigiría
+  `--force`, prohibido por la política del repo: se declaró en un comentario del PR en lugar de
+  esconderlo, y este documento viaja en su propia rama.
 
 ## Progreso
 
 - 2026-11-05 documento creado antes del primer cambio.
+- 2026-11-05 T1–T4 escritos y verificados; T5–T6 pendientes de PR y merge.
 
 ## Siguiente paso
 
-T1–T4: los textos.
+T5–T6: PR a `dev` y merge. Con eso queda todo el plan de la sección 22 terminado y solo faltan los
+hitos de release, que son del humano.
 
 ## Git
 
@@ -94,8 +112,17 @@ T1–T4: los textos.
 
 ## Decisiones
 
-- (pendiente)
+- **Los números del README salen de `evals/resultados.md`**, no de una estimación: si alguien
+  regenera el dataset los números pueden cambiar, y el README dice cómo medirlos.
+- **El coste se presenta como estimación** con la letra pequeña (lista de OpenAI en dólares usada
+  como euros), porque fingir una conversión de divisa sería peor que no dar la cifra.
+- **Las métricas de ahorro son supuestos explícitos**, no promesas: el README dice cuántas horas
+  ahorraría con un porcentaje de automatización y de dónde sale ese porcentaje.
+- **Cada decisión importante enlaza a un ADR**: el README no reinventa la argumentación, la delega.
 
 ## RDD
 
-- (pendiente)
+- Riesgo: **bajo** (solo documentación) · Sin lentes: lectura estructural · El `assess` del
+  candidato de las correcciones ya cubrió el código; aquí no cambia ni una línea ejecutable.
+- Verificación estructural aplicada: todos los enlaces internos resuelven, los comandos existen, los
+  números coinciden con `evals/resultados.md` y la suite sigue en 219 tests.
