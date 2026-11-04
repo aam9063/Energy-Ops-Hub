@@ -40,7 +40,13 @@ def entorno_hubspot(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def limpiar() -> Iterator[None]:
+    """Limpia antes y después: una base local con filas de una corrida anterior no debe romper."""
+    _limpiar()
     yield
+    _limpiar()
+
+
+def _limpiar() -> None:
     with SessionLocal() as sesion:
         sesion.execute(
             delete(Anomalia).where(
@@ -153,9 +159,13 @@ def test_un_fallo_de_hubspot_al_crear_ticket_da_503_y_no_guarda_id() -> None:
         guardada = sesion.get(Anomalia, anomalia_id)
         assert guardada is not None
         assert guardada.hubspot_ticket_id is None
+        # El evento de *esta* anomalía: buscar «el primero de la operación» dependía del orden
+        # de la tabla y de filas de otras corridas.
         evento = sesion.scalar(
             select(EventoSync).where(
-                EventoSync.sistema == "hubspot", EventoSync.operacion == "ticket_anomalia"
+                EventoSync.sistema == "hubspot",
+                EventoSync.operacion == "ticket_anomalia",
+                EventoSync.entidad_id == str(anomalia_id),
             )
         )
         assert evento is not None
