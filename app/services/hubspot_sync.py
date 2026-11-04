@@ -56,6 +56,21 @@ def _fecha_negocio(negocio: dict[str, Any]) -> datetime | None:
         return None
 
 
+def respuesta_vieja(fecha_negocio: datetime | None, estado_desde: datetime | None) -> bool:
+    """True si la respuesta del CRM es anterior al último cambio de estado local.
+
+    Solo se compara cuando los dos extremos son comparables: una fecha ausente, un
+    `estado_desde` nulo (fila antigua o creada fuera del ORM) o una diferencia de zona horaria
+    no pueden impedir que se aplique una fase nueva. Comparar sin comprobar reventaba con
+    `TypeError` y tumbaba la sincronización entera.
+    """
+    if fecha_negocio is None or estado_desde is None:
+        return False
+    if (fecha_negocio.tzinfo is None) != (estado_desde.tzinfo is None):
+        return False
+    return fecha_negocio < estado_desde
+
+
 def _procesar_negocio(sesion: Session, negocio: dict[str, Any], resumen: dict[str, int]) -> None:
     """Aplica la fase de un negocio al suministro, contando el resultado en el resumen."""
     propiedades = negocio.get("properties", {})
@@ -74,8 +89,7 @@ def _procesar_negocio(sesion: Session, negocio: dict[str, Any], resumen: dict[st
     if nuevo_estado == suministro.estado:
         resumen["omitidos"] += 1  # solo se toca el estado cuando la fase cambió
         return
-    fecha_negocio = _fecha_negocio(negocio)
-    if fecha_negocio is not None and fecha_negocio < suministro.estado_desde:
+    if respuesta_vieja(_fecha_negocio(negocio), suministro.estado_desde):
         resumen["omitidos"] += 1  # respuesta vieja: no retrocede el estado
         return
     suministro.estado = nuevo_estado

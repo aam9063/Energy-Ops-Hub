@@ -19,6 +19,7 @@ from app.main import app
 from app.models import Cliente, EventoSync, Suministro
 from app.services import hubspot as modulo_hubspot
 from app.services.hubspot import HubSpot
+from app.services.hubspot_sync import respuesta_vieja
 from fastapi.testclient import TestClient
 from httpx import Response
 from sqlalchemy import delete, func, select
@@ -267,3 +268,28 @@ def test_hubspot_agotado_responde_503_y_no_actualiza_la_marca(
             )
         )
         assert fallo is not None
+
+
+def test_respuesta_vieja_no_revienta_con_extremos_ausentes_o_incomparables() -> None:
+    """`estado_desde` nulo o con otra zona horaria no puede tumbar la sincronización.
+
+    Antes de esta comprobación, comparar una fecha con `None` lanzaba `TypeError` y abortaba el
+    sync entero: el refuter del RDD de la feature 07 lo corroboró en `hubspot_sync.py`.
+    """
+    aware = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
+    naive = datetime(2026, 5, 1, 12, 0)
+
+    assert respuesta_vieja(None, aware) is False
+    assert respuesta_vieja(aware, None) is False
+    assert respuesta_vieja(None, None) is False
+    assert respuesta_vieja(aware, naive) is False
+    assert respuesta_vieja(naive, aware) is False
+
+
+def test_respuesta_vieja_compara_cuando_los_extremos_son_comparables() -> None:
+    """La regla de no-retroceso se mantiene cuando ambos extremos son conscientes del huso."""
+    estado_desde = datetime(2026, 5, 10, 9, 0, tzinfo=UTC)
+
+    assert respuesta_vieja(datetime(2026, 5, 1, 9, 0, tzinfo=UTC), estado_desde) is True
+    assert respuesta_vieja(datetime(2026, 5, 20, 9, 0, tzinfo=UTC), estado_desde) is False
+    assert respuesta_vieja(estado_desde, estado_desde) is False
