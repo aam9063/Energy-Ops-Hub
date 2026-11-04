@@ -14,6 +14,7 @@ import pytest
 from app.config import settings
 from app.schemas import FacturaExtraida
 from app.services import extraction
+from app.services.extraction import ProveedorNoDisponible
 from openai import OpenAIError
 from pydantic import ValidationError
 from reportlab.pdfgen.canvas import Canvas
@@ -212,3 +213,18 @@ def test_un_periodo_invertido_es_una_extraccion_invalida() -> None:
 
     with pytest.raises(ValidationError):
         FacturaExtraida.model_validate(datos)
+
+
+def test_un_error_del_proveedor_no_es_una_extraccion_invalida(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un fallo del proveedor es un 503 reintentable, no un documento inválido."""
+    cliente = _ClienteFalso(error=OpenAIError("invalid api key sk-proj-xyz"))
+    _instalar_cliente(monkeypatch, cliente)
+
+    with pytest.raises(ProveedorNoDisponible) as excinfo:
+        extraction.extraer_factura(_pdf_bytes())
+
+    # El mensaje del SDK no se propaga: podría llevar datos de la cuenta o de la clave.
+    assert "sk-proj-xyz" not in str(excinfo.value)
+    assert "OpenAIError" in str(excinfo.value)
