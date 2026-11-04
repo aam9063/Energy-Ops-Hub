@@ -14,9 +14,10 @@ from app.db import SessionLocal
 from app.domain.cups import letras_control
 from app.main import app
 from app.models import Anomalia, Cliente, EventoSync, Factura, Suministro
+from app.routers import facturas as router_facturas
 from app.schemas import FacturaExtraida
 from app.services import invoices
-from app.services.extraction import ExtraccionInvalida
+from app.services.extraction import ExtraccionInvalida, ProveedorNoDisponible
 from fastapi.testclient import TestClient
 from reportlab.pdfgen.canvas import Canvas
 from sqlalchemy import delete, func, select
@@ -343,3 +344,39 @@ def test_get_facturas_filtros(monkeypatch: pytest.MonkeyPatch, cartera: None) ->
 
     por_hasta = cliente_http.get("/facturas", params={"hasta": "2026-02-28"})
     assert [f["id"] for f in por_hasta.json()] == [id_a]
+
+
+def test_un_pdf_demasiado_grande_da_413_sin_llamar_al_modelo(
+    monkeypatch: pytest.MonkeyPatch, cartera: None
+) -> None:
+    """El tope de subida se comprueba antes de gastar una llamada al modelo."""
+    llamadas = _instalar_extraccion(monkeypatch, datos=_datos())
+    monkeypatch.setattr(router_facturas, "MAX_BYTES_PDF", 100)
+    cliente_http = TestClient(app)
+
+    respuesta = _subir(cliente_http, _pdf("Factura T04-GRANDE de Voltia Energia"))
+
+    assert respuesta.status_code == 413
+    assert llamadas == []
+
+
+def test_un_fallo_del_proveedor_da_503_y_no_guarda_nada(
+    monkeypatch: pytest.MonkeyPatch, cartera: None
+) -> None:
+    """Un fallo del proveedor es del sistema: 503 para que n8n reintente, sin fila nueva."""
+    _instalar_extraccion(
+        monkeypatch,
+        error=ProveedorNoDisponible("El proveedor del LLM falló: AuthenticationError"),
+    )
+    cliente_http = TestClient(app)
+
+    respuesta = _subir(cliente_http, _pdf("Factura T04-503 de Voltia Energia"))
+
+    assert respuesta.status_code == 503
+    with SessionLocal() as sesion:
+        guardadas = sesion.scalar(
+            select(func.count()).select_from(Factura).where(Factura.numero == "T04-503")
+        )
+        assert guardadas == 0
+        evento = sesion.scalar(select(EventoSync).where(EventoSync.ok.is_(False)))
+        assert evento is not None

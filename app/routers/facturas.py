@@ -15,8 +15,11 @@ from app.db import get_session
 from app.domain.cups import normalizar_cups
 from app.models import Anomalia, Cliente, EventoSync, Factura, Suministro
 from app.schemas import AnomaliaOut, FacturaOut, FacturaSubidaOut
-from app.services.extraction import ExtraccionInvalida
+from app.services.extraction import ExtraccionInvalida, ProveedorNoDisponible
 from app.services.invoices import hash_factura, procesar_factura
+
+# Tope de subida: por encima de esto se rechaza antes de gastar una llamada al modelo.
+MAX_BYTES_PDF = 10 * 1024 * 1024
 
 router = APIRouter(prefix="/facturas", tags=["facturas"])
 
@@ -64,7 +67,12 @@ def subir_factura(
     """
     nombre = archivo.filename or ""
     tipo = archivo.content_type or ""
-    pdf_bytes = archivo.file.read()
+    pdf_bytes = archivo.file.read(MAX_BYTES_PDF + 1)
+    if len(pdf_bytes) > MAX_BYTES_PDF:
+        raise HTTPException(
+            status_code=413,
+            detail=f"El PDF supera el tamaño máximo de {MAX_BYTES_PDF // (1024 * 1024)} MB",
+        )
     es_pdf = pdf_bytes.startswith(b"%PDF") and (
         "pdf" in tipo.lower() or nombre.lower().endswith(".pdf")
     )
@@ -73,6 +81,16 @@ def subir_factura(
     archivo_hash = hash_factura(pdf_bytes)
     try:
         resultado = procesar_factura(sesion, pdf_bytes)
+    except ProveedorNoDisponible as exc:
+        sesion.rollback()
+        _registrar_evento(
+            sesion,
+            ok=False,
+            entidad_id=archivo_hash,
+            detalle={"archivo_hash": archivo_hash, "error": str(exc)},
+        )
+        sesion.commit()
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ExtraccionInvalida as exc:
         sesion.rollback()
         _registrar_evento(
