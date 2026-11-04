@@ -1,4 +1,4 @@
-"""Orquestación de la ingesta de facturas (docs/spec.md, secciones 7 y 9).
+"""Orquestación de la ingesta de facturas (docs/spec.md, secciones 7, 9 y 10).
 
 Idempotencia en dos niveles, que son las dos restricciones UNIQUE de `facturas`:
 
@@ -7,26 +7,27 @@ Idempotencia en dos niveles, que son las dos restricciones UNIQUE de `facturas`:
 - `(cups_leido, numero, comercializadora)` UNIQUE: dos PDFs distintos de la misma factura
   tampoco duplican nada.
 
-La política de revisión humana (R11) es la primera anomalía del sistema: confianza < 0,85 o
-algún campo dudoso la disparan (sección 9). El servicio no hace commit: lo hace el router,
-junto con la fila de auditoría en `eventos_sync`.
+Tras crear la factura se evalúan todas las reglas (R1–R9 y R11, funciones puras en
+`app/domain/rules.py`) contra su contexto real, y las anomalías se persisten de forma
+idempotente. Cuando llega un segundo PDF con la misma clave de negocio (que no se inserta
+por la restricción UNIQUE), la factura guardada se reevalúa con la copia nueva como
+candidata: así R3 marca la duplicada sin duplicar filas.
+
+El servicio no hace commit: lo hace el router, junto con la fila de auditoría en
+`eventos_sync`.
 """
 
 import hashlib
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.cups import normalizar_cups
-from app.models import Anomalia, Factura, Suministro
-from app.schemas import FacturaExtraida
+from app.models import Factura, Suministro
 from app.services.extraction import extraer_factura
-
-UMBRAL_CONFIANZA = 0.85
-REGLA_REVISION = "R11"
+from app.services.rules import a_factura_de_extraccion, evaluar_y_guardar
 
 
 def hash_factura(pdf_bytes: bytes) -> str:
@@ -56,10 +57,12 @@ class ResultadoFactura:
 
 
 def procesar_factura(sesion: Session, pdf_bytes: bytes) -> ResultadoFactura:
-    """Procesa un PDF de factura: extrae con el LLM, resuelve idempotencia y persiste.
+    """Procesa un PDF de factura: extrae con el LLM, resuelve idempotencia, evalúa y persiste.
 
     Si el PDF ya se procesó (por hash) o la factura ya existe (por clave de negocio),
     devuelve la factura existente con `creada=False` sin llamar al LLM en el primer caso.
+    En el segundo caso, además, reevalúa las reglas sobre la factura guardada con la copia
+    que llega como candidata (R3). Nunca hace commit.
     """
     archivo_hash = hash_factura(pdf_bytes)
     existente = sesion.scalar(select(Factura).where(Factura.archivo_hash == archivo_hash))
@@ -78,12 +81,19 @@ def procesar_factura(sesion: Session, pdf_bytes: bytes) -> ResultadoFactura:
         )
     )
     if existente is not None:
+        # La misma clave de negocio con otro archivo es exactamente la regla R3: la
+        # copia nueva no se inserta, pero la factura guardada se reevalúa con ella.
+        evaluar_y_guardar(
+            sesion,
+            existente,
+            candidatas_extra=[a_factura_de_extraccion(datos, archivo_hash)],
+        )
         return ResultadoFactura(factura=existente, creada=False, archivo_hash=archivo_hash)
 
     suministro = sesion.scalar(select(Suministro).where(Suministro.cups == cups))
     # La salida completa del modelo, serializable, más los metadatos de la llamada (modelo y
     # tokens) bajo una clave reservada: así se audita el coste sin llamar otra vez (sección 7).
-    crudos: dict[str, Any] = datos.model_dump(mode="json")
+    crudos: dict[str, object] = datos.model_dump(mode="json")
     crudos["_extraccion"] = meta
     factura = Factura(
         suministro_id=suministro.id if suministro is not None else None,
@@ -105,35 +115,6 @@ def procesar_factura(sesion: Session, pdf_bytes: bytes) -> ResultadoFactura:
         datos_crudos=crudos,
     )
     sesion.add(factura)
-    sesion.flush()  # hace falta factura.id para la anomalía de revisión
-    _crear_revision_humana(sesion, factura, datos)
+    sesion.flush()  # hace falta factura.id para las anomalías
+    evaluar_y_guardar(sesion, factura)
     return ResultadoFactura(factura=factura, creada=True, archivo_hash=archivo_hash)
-
-
-def _crear_revision_humana(sesion: Session, factura: Factura, datos: FacturaExtraida) -> None:
-    """R11 «Revisión de extracción»: confianza < 0,85 o campos dudosos (sección 9).
-
-    Idempotente respecto de la restricción UNIQUE (factura_id, regla): si la anomalía ya
-    existe, no se duplica.
-    """
-    if datos.confianza >= UMBRAL_CONFIANZA and not datos.campos_dudosos:
-        return
-    motivos = []
-    if datos.confianza < UMBRAL_CONFIANZA:
-        motivos.append(f"confianza {datos.confianza:.2f} (umbral {UMBRAL_CONFIANZA})")
-    if datos.campos_dudosos:
-        motivos.append("campos dudosos: " + ", ".join(datos.campos_dudosos))
-    existe = sesion.scalar(
-        select(Anomalia).where(Anomalia.factura_id == factura.id, Anomalia.regla == REGLA_REVISION)
-    )
-    if existe is not None:
-        return
-    sesion.add(
-        Anomalia(
-            factura_id=factura.id,
-            suministro_id=factura.suministro_id,
-            regla=REGLA_REVISION,
-            severidad="media",
-            detalle="Revisión de extracción: " + "; ".join(motivos),
-        )
-    )
