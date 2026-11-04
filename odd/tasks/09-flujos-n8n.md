@@ -40,13 +40,13 @@ Cita literal de `docs/spec.md`, sección 13:
 
 ## Checklist
 
-- [ ] T1 `F1_facturas_email.json`: trigger de email, filtro de PDF, split de adjuntos, `POST /facturas`
+- [x] T1 `F1_facturas_email.json`: trigger de email, filtro de PDF, split de adjuntos, `POST /facturas`
   con `X-API-Key`, decisión por severidad alta y creación del ticket en la API
-- [ ] T2 `F2_altas_paradas.json`: reloj de días laborables a las 8:30, `GET /altas?parada_dias=7`,
+- [x] T2 `F2_altas_paradas.json`: reloj de días laborables a las 8:30, `GET /altas?parada_dias=7`,
   corte si está vacío, agrupación por cliente y aviso
-- [ ] T3 `F3_sync_hubspot.json`: reloj de 15 minutos, `POST /sync/hubspot` y aviso si hay errores
-- [ ] T4 JSON sin credenciales, nombres descriptivos y notas adhesivas en los tres flujos
-- [ ] T5 `tests/test_n8n_flows.py`: JSON válido, conexiones que apuntan a nodos existentes, sin
+- [x] T3 `F3_sync_hubspot.json`: reloj de 15 minutos, `POST /sync/hubspot` y aviso si hay errores
+- [x] T4 JSON sin credenciales, nombres descriptivos y notas adhesivas en los tres flujos
+- [x] T5 `tests/test_n8n_flows.py`: JSON válido, conexiones que apuntan a nodos existentes, sin
   campos de credenciales y endpoints esperados en cada flujo
 - [ ] T6 verificación, evidencia, RDD (riesgo medio, una lente), PR y merge
 
@@ -62,15 +62,47 @@ Cita literal de `docs/spec.md`, sección 13:
 
 ## Evidencia
 
-- (pendiente)
+- **Implementación**: un worker con este documento como contrato; el orquestador verificó después.
+- **F1** (10 nodos): Gmail Trigger con filtro `has:attachment filename:pdf` → IF de adjunto →
+  `splitOut` → `POST {{$vars.API_URL}}/facturas` con `X-API-Key` → IF de severidad alta →
+  `POST …/anomalias/{{id}}/ticket` → aviso por email. Tres notas adhesivas, una de ellas explicando
+  **por qué el ticket lo crea la API y no el nodo de HubSpot**.
+- **F2** (7 nodos): reloj `30 8 * * 1-5` → `GET …/altas?parada_dias=7` → IF de lista vacía → `Code`
+  que agrupa por cliente y devuelve un solo ítem con `total_altas`, `clientes_afectados` y
+  `resumen` → aviso.
+- **F3** (6 nodos): reloj `*/15 * * * *` → `POST …/sync/hubspot` → IF `errores > 0` → aviso con el
+  resumen del sync.
+- **T4**: cero claves `credentials`; toda URL y clave salen de `$vars` (`API_URL`, `API_KEY`,
+  `RESPONSABLE_EMAIL`, `HUBSPOT_PORTAL_URL`) y la configuración se documenta en notas. Verificado con
+  el mismo `grep` del job `integrations`: **sin credenciales embebidas**.
+- **T5**: `uv run pytest tests/test_n8n_flows.py` → **31 tests** de estructura, con RED observado
+  rompiendo a propósito una conexión de F3. `uv run pytest` → **189 passed**.
+- **Verificación independiente del orquestador**: los tres JSON parsean (`python -m json.tool`, que
+  es el equivalente local de `jq empty` — **`jq` no está instalado en esta máquina**, y el CI sí lo
+  usa); script propio sobre `connections`: **0 conexiones rotas**, ids únicos y los únicos nodos sin
+  arista de entrada son los triggers y las notas adhesivas, que es lo correcto.
+- **Lint y tipos**: `uv run ruff check .` → `All checks passed!` · `uv run ruff format --check .` →
+  `47 files already formatted` · `uv run mypy app scripts tests evals` → `Success: no issues found in
+  42 source files`.
+
+## No verificado, y por qué
+
+- **Importación real en n8n**: no hay instancia levantada. Los `typeVersion` (if 2.2, httpRequest 4.2,
+  code 2, gmail 2.1, scheduleTrigger 1.2, gmailTrigger 1.2) son los vigentes en n8n reciente, pero
+  eso se confirma al importar. Igual con `inputDataFieldName: "attachment_0"` del multipart de F1:
+  es el nombre que usa el Gmail Trigger y hay que verificarlo contra la versión desplegada.
+- **Credenciales de Gmail**: las conecta el humano después de importar; el JSON no las lleva a
+  propósito.
 
 ## Progreso
 
 - 2026-11-05 documento creado antes del primer cambio de código.
+- 2026-11-05 T1–T5 implementados y verificados; T6 pendiente de RDD y PR.
 
 ## Siguiente paso
 
-T1–T3: los tres flujos.
+T6: RDD (riesgo medio, una lente), PR a `dev` y merge. Después, hito **v0.2.0** (merge `dev`→`main`
+y release, del humano) y las features 11 y 12.
 
 ## Git
 
@@ -79,7 +111,16 @@ T1–T3: los tres flujos.
 
 ## Decisiones
 
-- (pendiente)
+- **Gmail Trigger** en F1 (la spec admite Gmail o IMAP): filtra por PDF en la búsqueda y descarga los
+  adjuntos, que es lo que evita abrir el buzón a mano.
+- **El corte por lista vacía en F2 lo hace un IF, no el nodo `Code`**: con `alwaysOutputData: true`
+  el HTTP siempre emite un ítem y el IF decide. El `Code` no toma decisiones de negocio: agrupa y
+  presenta, que es lo único que se le permite a n8n en este proyecto.
+- **F3 solo avisa de `errores > 0` en una respuesta 2xx**; un 5xx lo recoge el flujo de errores de
+  n8n, que es la feature 12. Está anotado en la nota del flujo para que nadie lo confunda con un
+  fallo silencioso.
+- **`meta.templateCredsSetupCompleted: false`** en lugar de un `instanceId` inventado: un identificador
+  falso en el repo no aporta nada y confunde al importar.
 
 ## RDD
 
