@@ -33,8 +33,8 @@ Cita literal de `docs/spec.md`, sección 22:
 - [x] T4 tests de esquema que cubren `app/models.py` y llevan la cobertura por encima del 75 %
 - [x] T5 validación local: hooks de YAML, cobertura y `actionlint` si está disponible
 - [x] T6 push y CI en verde en el propio PR
-- [ ] T7 squash merge a `dev`
-- [ ] T8 protección de `main` y `dev` con `ci-ok` obligatorio, y verificación
+- [x] T7 squash merge a `dev`
+- [x] T8 protección de `main` y `dev` con `ci-ok` obligatorio, y verificación
 
 ## Criterios de aceptación
 
@@ -60,19 +60,33 @@ Cita literal de `docs/spec.md`, sección 22:
   `Unable to resolve action astral-sh/setup-uv@v10, unable to find version v10`. El proyecto solo
   publica tags mayores hasta `v7` (comprobado con la API). Corregido en `fix(ci)`; segundo run:
   `lint`, `test`, `integrations`, `secrets`, `docker` y `ci-ok` en `pass`.
+- **T7** `gh pr merge 2 --squash` → `b2466cb ci: add GitHub Actions pipeline with aggregated ci-ok
+  check (#2)` en `dev`, rama borrada.
+- **T8** Protección aplicada con `gh api` sobre `dev` y `main`, y leída de vuelta:
+  `{"checks":["ci-ok"],"strict":true,"admins":true,"linear":true,"force":false,"delete":false}`
+  en `dev` y lo mismo con `linear: false` en `main`. Prueba real: un commit vacío empujado a `dev`
+  fue rechazado con `Changes must be made through a pull request` y
+  `Required status check "ci-ok" is expected`; el commit de prueba se descartó con
+  `git reset --soft origin/dev` y el árbol quedó limpio.
 
 ## Progreso
 
 - 2026-11-04 documento creado antes del primer cambio de código.
+- 2026-11-04 T1–T5 hechos: workflow, Dependabot, plantilla de PR y tests de esquema (97 % de
+  cobertura).
+- 2026-11-04 T6 hecho: dos corridas del CI, el segundo intento en verde tras corregir la versión
+  de `setup-uv`.
+- 2026-11-04 T7–T8 hechos: PR #2 mergeado y ramas protegidas, con la protección probada.
 
 ## Siguiente paso
 
-T1: escribir `ci.yml`.
+Feature 03 (`03-datos-sinteticos`): generador de 120 PDFs con tres maquetaciones, anomalías
+inyectadas y ground truth para las evals.
 
 ## Git
 
 - Rama: `ci/02-pipeline-ci`
-- PR: (pendiente)
+- PR: #2 (`ci/02-pipeline-ci` → `dev`)
 
 ## Decisiones
 
