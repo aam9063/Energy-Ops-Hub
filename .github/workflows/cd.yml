@@ -1,0 +1,90 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false # nunca cortar un despliegue a medias
+
+jobs:
+  image:
+    name: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha
+            type=raw,value=main
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: deploy
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: ${{ vars.API_PUBLIC_URL }}
+    steps:
+      - name: Lanzar el despliegue
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.DEPLOY_HOOK_URL }}
+        run: curl -fsS -X POST "$DEPLOY_HOOK_URL"
+      - name: Smoke test
+        env:
+          API_PUBLIC_URL: ${{ vars.API_PUBLIC_URL }}
+        run: |
+          for intento in $(seq 1 30); do
+            if curl -fsS "$API_PUBLIC_URL/health"; then exit 0; fi
+            sleep 10
+          done
+          echo "::error::La API no responde en /health tras el despliegue"
+          exit 1
+
+  apps-script:
+    name: apps-script
+    needs: deploy
+    if: ${{ vars.DEPLOY_APPS_SCRIPT == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - run: npm install --global @google/clasp
+      - name: Credenciales de clasp
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
+      - name: Subir el código a Apps Script
+        working-directory: apps_script
+        run: clasp push --force
