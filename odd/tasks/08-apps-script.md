@@ -37,14 +37,14 @@ Cita literal de `docs/spec.md`, sección 11:
 
 ## Checklist
 
-- [ ] T1 `Code.gs` con el menú **Energy Ops** y las tres acciones
-- [ ] T2 `validarFilas`: CUPS con BigInt, duplicados en la hoja, campos obligatorios y tipo válido;
+- [x] T1 `Code.gs` con el menú **Energy Ops** y las tres acciones
+- [x] T2 `validarFilas`: CUPS con BigInt, duplicados en la hoja, campos obligatorios y tipo válido;
   una sola lectura y una sola escritura de la hoja, con los fondos en rojo y el motivo en `mensaje`
-- [ ] T3 `enviarAltas`: solo filas `validada`, una sola llamada a `/altas/lote`, resultado por fila
-- [ ] T4 `actualizarEstados` e `informeDiario` (pestaña `Resumen` y email con las altas paradas)
-- [ ] T5 secretos en Script Properties (`API_URL`, `API_KEY`), nunca en el código
-- [ ] T6 `appsscript.json` con los permisos mínimos y la zona horaria de Madrid
-- [ ] T7 test de la lógica de CUPS ejecutable con `node`, y paso en el job `integrations` del CI
+- [x] T3 `enviarAltas`: solo filas `validada`, una sola llamada a `/altas/lote`, resultado por fila
+- [x] T4 `actualizarEstados` e `informeDiario` (pestaña `Resumen` y email con las altas paradas)
+- [x] T5 secretos en Script Properties (`API_URL`, `API_KEY`), nunca en el código
+- [x] T6 `appsscript.json` con los permisos mínimos y la zona horaria de Madrid
+- [x] T7 test de la lógica de CUPS ejecutable con `node`, y paso en el job `integrations` del CI
 - [ ] T8 verificación, evidencia, RDD (riesgo medio, una lente), PR y merge
 
 ## Criterios de aceptación
@@ -59,15 +59,39 @@ Cita literal de `docs/spec.md`, sección 11:
 
 ## Evidencia
 
-- (pendiente)
+- **Implementación**: un worker con este documento como contrato; el orquestador verificó después.
+- **T1–T2**: `apps_script/Code.gs` con el menú **Energy Ops**, `cupsValido_` con `BigInt` y
+  `validarFilas()` con **una** lectura (`getDataRange().getValues()`), **una** escritura
+  (`setValues`) y los fondos en un solo `setBackgrounds`; las filas ya `enviada` no se tocan.
+- **T3–T4**: `enviarAltas()` en una sola llamada a `/altas/lote` con `muteHttpExceptions`, y
+  `actualizarEstados()` + `informeDiario()` consumiendo el `GET /altas` real.
+- **T5–T6**: secretos por `Script Properties` (`API_URL`, `API_KEY`), sin URL ni clave en el código;
+  `appsscript.json` con `Europe/Madrid`, V8 y solo los scopes necesarios.
+- **T7**: `node apps_script/test_cups.js` → **19/19 casos**, y paso nuevo en el job `integrations`
+  del CI que lo ejecuta (tolerante a que el archivo no exista todavía). `node --check` sobre
+  `Code.gs` copiado a `.js` → OK; el `.gs` directo falla por la extensión, que es justo el motivo
+  del paso de copia que ya tenía el CI.
+- **Hallazgo del worker que obligó a corregir el backend**: `POST /altas/lote` pedía `nif` y no
+  aceptaba `fila`, mientras la sección 11 manda `cliente_nif` y `fila`; y **`GET /altas` no
+  existía** aunque la sección 15 lo define y el script lo necesita. Con eso, el `Code.gs` de la spec
+  habría recibido 422 en todas las filas. Se alineó la API a la spec: `FilaAlta` con
+  `fila: int` y `cliente_nif` (alias `nif` aceptado por compatibilidad), `ResultadoFila.fila` como
+  eco exacto —probado con un lote desordenado `[10, 5, 7, 3]`— y el endpoint `GET /altas` con
+  `parada_dias`, `{cups, cliente, estado, dias_parada}` y orden por antigüedad.
+- **Verificación del orquestador**: `uv run pytest` → **158 passed** · `uv run mypy app scripts
+  tests evals` → `Success: no issues found in 41 source files` · `uv run ruff check .` → `All checks
+  passed!` · cobertura de `app/`: `TOTAL 990 30 97%` · `node apps_script/test_cups.js` → `19/19`.
 
 ## Progreso
 
 - 2026-11-05 documento creado antes del primer cambio de código.
+- 2026-11-05 T1–T7 implementados por el worker; la alineación del contrato de altas y el endpoint
+  `GET /altas` entraron en la misma entrega. Falta T8.
 
 ## Siguiente paso
 
-T1: el menú y la validación.
+T8: RDD (riesgo medio, una lente), PR a `dev` y merge. Después, feature 09: los flujos de n8n, cuyo
+F2 ya puede usar `GET /altas`.
 
 ## Git
 
@@ -76,7 +100,17 @@ T1: el menú y la validación.
 
 ## Decisiones
 
-- (pendiente)
+- **Manda la spec**: cuando el worker detectó que la API pedía `nif` y no aceptaba `fila`, se cambió
+  el backend, no el script. El script de la sección 11 es el contrato con el usuario.
+- **El alias `nif` se conserva** con `AliasChoices` para no romper a quien ya lo usara, pero el campo
+  canónico y documentado es `cliente_nif`; un test pinnea el alias para que no se caiga por descuido.
+- **`ResultadoFila.fila` es eco exacto**, no la posición en el lote: la hoja necesita saber dónde
+  escribir y un lote desordenado no puede confundirla.
+- **`GET /altas` sin `parada_dias` devuelve todas las altas en trámite**, y con el filtro aplica
+  «más de N días» de forma estricta. Es lo que usan la opción 3 del menú y el informe diario, y
+  también el flujo F2 de n8n.
+- **El Apps Script no inventa endpoints**: si la API falla, avisa con el código HTTP y no toca los
+  datos de la hoja. Preferible un mensaje claro a un estado inventado.
 
 ## RDD
 

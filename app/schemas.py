@@ -9,7 +9,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 
 class FacturaExtraida(BaseModel):
@@ -115,9 +115,13 @@ class FacturaSubidaOut(FacturaOut):
 
 
 class FilaAlta(BaseModel):
-    """Una fila del lote de altas (`POST /altas/lote`)."""
+    """Una fila del lote de altas (`POST /altas/lote`, docs/spec.md, sección 11)."""
 
-    nif: str = Field(description="NIF del cliente al que pertenece el suministro")
+    fila: int = Field(description="Fila de la hoja de origen: el resultado la devuelve tal cual")
+    cliente_nif: str = Field(
+        validation_alias=AliasChoices("cliente_nif", "nif"),
+        description="NIF del cliente al que pertenece el suministro",
+    )
     cups: str = Field(description="CUPS, se normaliza y valida con las letras de control")
     tipo: str = Field(description="Tipo de suministro: luz, gas o agua")
     direccion: str = Field(description="Dirección del punto de suministro")
@@ -155,6 +159,15 @@ class AltaLoteOut(BaseModel):
 
     resultados: list[ResultadoFila]
     resumen: ResumenLote
+
+
+class AltaParadaOut(BaseModel):
+    """Una alta en trámite del listado `GET /altas` (sección 15)."""
+
+    cups: str = Field(description="CUPS normalizado de la alta")
+    cliente: str = Field(description="Nombre del cliente al que pertenece la alta")
+    estado: str = Field(description="Estado actual: pendiente o en_tramite")
+    dias_parada: int = Field(description="Días enteros que lleva la alta en el mismo estado")
 
 
 class TicketCreadoOut(BaseModel):

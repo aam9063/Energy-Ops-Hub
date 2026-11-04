@@ -98,6 +98,12 @@ jobs:
             cp "$f" "/tmp/$(basename "$f" .gs).js"
             node --check "/tmp/$(basename "$f" .gs).js"
           done
+      - name: Test de CUPS de Apps Script
+        shell: bash
+        run: |
+          if [ -f apps_script/test_cups.js ]; then
+            node apps_script/test_cups.js
+          fi
 
   secrets:
     name: secrets
