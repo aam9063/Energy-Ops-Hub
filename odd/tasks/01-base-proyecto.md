@@ -27,15 +27,15 @@ Cita literal de `docs/spec.md`, sección 22:
 
 ## Checklist
 
-- [ ] T1 pyproject con uv, estructura de paquetes, ruff/mypy/pytest
-- [ ] T2 config con pydantic-settings y `.env.example`
-- [ ] T3 validación de CUPS con tests (RED → GREEN)
-- [ ] T4 modelos SQLAlchemy, engine/sesión y migración inicial de Alembic
-- [ ] T5 FastAPI con middleware `X-API-Key` y `/health` contra la BD, con tests
-- [ ] T6 docker-compose, Dockerfile y `.dockerignore`
-- [ ] T7 `scripts/seed.py` con clientes y suministros de ejemplo
-- [ ] T8 pre-commit con ruff, hooks básicos y gitleaks
-- [ ] T9 verificación completa y evidencia
+- [x] T1 pyproject con uv, estructura de paquetes, ruff/mypy/pytest
+- [x] T2 config con pydantic-settings y `.env.example`
+- [x] T3 validación de CUPS con tests (RED → GREEN)
+- [x] T4 modelos SQLAlchemy, engine/sesión y migración inicial de Alembic
+- [x] T5 FastAPI con middleware `X-API-Key` y `/health` contra la BD, con tests
+- [x] T6 docker-compose, Dockerfile y `.dockerignore`
+- [x] T7 `scripts/seed.py` con clientes y suministros de ejemplo
+- [x] T8 pre-commit con ruff, hooks básicos y gitleaks
+- [x] T9 verificación completa y evidencia
 - [ ] T10 RDD del candidato, PR a `dev`, merge y limpieza
 
 ## Criterios de aceptación
@@ -50,15 +50,41 @@ Cita literal de `docs/spec.md`, sección 22:
 
 ## Evidencia
 
-- (pendiente)
+- **T1** `uv run ruff check .` → `All checks passed!` · `uv run mypy app` → `Success: no issues found in 8 source files` · `uv run ruff format --check .` → `18 files already formatted`.
+- **T3** Primero en rojo: `uv run pytest tests/test_cups.py` → `ModuleNotFoundError: No module named 'app.domain.cups'`. Después: `15 passed`.
+- **T3 · verificación de la tabla de letras**: la función de la spec reproduce dos CUPS
+  públicos reales, `ES0031102846140001AK0F` (resto 90 → `AK`) y `ES0021000000000001RK`
+  (resto 44 → `RK`). Fuentes consultadas el 2026-11-04: <https://nbxprocess.es/blog/como-validar-un-cups/>
+  (estructura y cálculo con 529/23) y <https://es.wikipedia.org/wiki/C%C3%B3digo_Unificado_de_Punto_de_Suministro>
+  (formato y campo de control).
+- **T4** `DATABASE_URL=…@localhost… uv run alembic upgrade head` → `Running upgrade -> a6ae4c7bfd35,
+  create initial schema` · `uv run alembic check` → `No new upgrade operations detected.` ·
+  `\dt` → `alembic_version`, `anomalias`, `clientes`, `eventos_sync`, `facturas`, `suministros`.
+- **T5** `uv run pytest` → `21 passed` (15 de CUPS + 6 de `/health` y del middleware).
+- **T6** `docker compose build api` → `Image energy-ops-hub-api Built` ·
+  `docker compose down -v && docker compose up -d` → `api`, `db` y `n8n` en `Up` ·
+  `curl /health` → `{"status":"ok","database":"ok"}` con `HTTP 200` ·
+  log del contenedor → `Running upgrade -> a6ae4c7bfd35` antes de `Application startup complete`.
+- **T7** `uv run python -m scripts.seed` → `creados=43 actualizados=0`; segunda ejecución →
+  `creados=0 actualizados=40`; en la base: 3 clientes, 40 suministros, 40 CUPS distintos
+  (34 luz, 4 gas, 2 agua) y los 40 CUPS pasan `cups_valido`.
+- **T8** `uv run pre-commit autoupdate` → pre-commit-hooks `v6.0.0`, ruff `v0.17.3`, gitleaks
+  `v8.30.0` · `uv run pre-commit run --all-files` → los 8 hooks `Passed`.
+- **T9** `uv run ruff check .` → `All checks passed!` · `uv run ruff format --check .` →
+  `18 files already formatted` · `uv run mypy app scripts tests` → `Success: no issues found in
+  14 source files` · `uv run pytest` → `21 passed`.
 
 ## Progreso
 
 - 2026-11-04 documento creado antes del primer cambio de código.
+- 2026-11-04 T1–T3 hechos: proyecto con uv, settings y validación de CUPS con tests.
+- 2026-11-04 T4–T5 hechos: esquema completo con migración aplicada y `/health` con middleware.
+- 2026-11-04 T6–T8 hechos: stack Docker de punta a punta, seed idempotente y pre-commit.
+- 2026-11-04 T9 hecho: verificación completa desde un stack vacío.
 
 ## Siguiente paso
 
-T1: `pyproject.toml` con uv y la estructura de `app/`.
+T10: revisión RDD del candidato, PR a `dev` y merge. Después, feature 02 (`02-pipeline-ci`).
 
 ## Git
 
@@ -72,6 +98,21 @@ T1: `pyproject.toml` con uv y la estructura de `app/`.
 - El middleware `X-API-Key` se aplica a toda la API salvo `/health` y `/docs`: la demo necesita
   un sondeo sin credenciales para el smoke test del CD.
 - Los modelos usan `TIMESTAMPTZ` con `server_default=func.now()`, igual que la sección 7.
+- `docker-compose.yml` no redefine `command` en el servicio `api`: el `CMD` de la imagen aplica
+  `alembic upgrade head` antes de arrancar uvicorn. Con el `command` de la sección 18 las
+  migraciones no correrían y el criterio de aceptación no se cumpliría.
+- El servicio `api` declara `DATABASE_URL` con host `db` y usa `env_file` opcional
+  (`required: false`), así `docker compose up` funciona sin `.env` en la máquina.
+- Los tests fijan `DATABASE_URL` a localhost en `tests/conftest.py` antes de importar `app`,
+  porque el `.env` de cada desarrollador apunta a `db` (válido solo dentro de Docker).
+- ruff 0.17 formatea código dentro de Markdown y reescribió `docs/spec.md`; se excluyeron
+  `docs/` y `odd/` en `pyproject.toml` y los hooks de higiene tampoco tocan esas carpetas.
+  La spec se versiona literal.
+- `main` pasa a ser la rama por defecto del repositorio (pedido del humano), así que todo PR
+  se abre con `--base dev` explícito. `docs/spec.md` y `AGENTS.md` quedaron actualizados.
+- `.env.example` tiene un cambio pendiente de decisión (proveedor del LLM): el archivo local
+  declara `OPENAI_API_KEY`/`OPENAI_MODEL` en lugar de las variables de Anthropic de la spec.
+  Se resuelve al empezar la feature 04.
 
 ## RDD
 
