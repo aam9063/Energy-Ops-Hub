@@ -90,7 +90,7 @@ Cita literal de `docs/spec.md`, secciones 8 y 22:
   ideal, que es el techo contra el que se mide la feature 06).
 - **T6 determinismo**: dos ejecuciones en directorios distintos dan **los 240 archivos idénticos
   byte a byte** (SHA-256 comparado por archivo).
-- **T7 tests**: `uv run pytest` → `42 passed` (10 del generador, 31 previos). `uv run ruff check .`
+- **T7 tests**: `uv run pytest` → `41 passed` (10 del generador, 31 previos). `uv run ruff check .`
   → `All checks passed!` · `uv run mypy app scripts tests` → `Success: no issues found in 17 source
   files` · cobertura de `app/` sin cambios: 97 %.
 - **Defecto encontrado en la verificación del orquestador y corregido**: la factura `duplicada`
