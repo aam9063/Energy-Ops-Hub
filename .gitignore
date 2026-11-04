@@ -20,7 +20,8 @@ dist/
 coverage.xml
 htmlcov/
 
-# Evals y artefactos
+# Evals y artefactos: el dataset sintético se genera con scripts/generate_invoices.py
+evals/dataset/
 evals/cache/
 evals/resultados.md
 
