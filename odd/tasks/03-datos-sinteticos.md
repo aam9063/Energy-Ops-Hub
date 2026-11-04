@@ -53,7 +53,7 @@ Cita literal de `docs/spec.md`, secciones 8 y 22:
 - [x] T6 CLI (`--semilla`, `--limite`, `--salida`) y regeneración byte a byte determinista
 - [x] T7 tests: determinismo, coherencia de importes, CUPS válidos, proporción de anomalías y
       presencia de las seis clases
-- [ ] T8 verificación, evidencia, RDD y PR
+- [x] T8 verificación, evidencia, RDD y PR
 
 ## Criterios de aceptación
 
@@ -151,4 +151,13 @@ T8: RDD de la feature (una lente, riesgo medio), PR a `dev` y merge. Después, f
 
 ## RDD
 
-- (pendiente)
+- Riesgo: **medio** · Lente: `reliability` (la que fija la tabla 19.4) · Resultado: **aprobado** ·
+  Lineage `review-e8a75ec319fe51af`, 6 archivos y 1145 líneas sobre `dev`.
+- **Primer intento bloqueado, sin crear autoridad**: con el dataset versionado el candidato tenía
+  245 archivos y llegó `lens_context_budget_exceeded` en el preflight de `review.start`. No se creó
+  linaje, así que no hubo nada que abandonar ni reparar; se resolvió sacando los datos generados
+  del repositorio y volviendo a empezar con un candidato de 6 archivos. La lección queda en
+  `Decisiones`: los artefactos generados no son materia de revisión.
+- Aviso informativo, no bloqueante: `R3-001` (`scripts/generate_invoices.py:358`) señala la
+  división por `len(previos)` en `consumo_disparado`. Está protegida por `_es_candidata`, que exige
+  `mes >= 3`; se deja tal cual y se anota aquí para que quien lo lea no tenga que redescubrirlo.
