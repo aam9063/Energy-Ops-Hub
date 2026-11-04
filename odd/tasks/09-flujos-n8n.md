@@ -48,7 +48,7 @@ Cita literal de `docs/spec.md`, sección 13:
 - [x] T4 JSON sin credenciales, nombres descriptivos y notas adhesivas en los tres flujos
 - [x] T5 `tests/test_n8n_flows.py`: JSON válido, conexiones que apuntan a nodos existentes, sin
   campos de credenciales y endpoints esperados en cada flujo
-- [ ] T6 verificación, evidencia, RDD (riesgo medio, una lente), PR y merge
+- [x] T6 verificación, evidencia, RDD, PR y merge
 
 ## Criterios de aceptación
 
@@ -124,4 +124,21 @@ y release, del humano) y las features 11 y 12.
 
 ## RDD
 
-- (pendiente)
+- Riesgo: **medio** · Lente: `resilience` · Resultado: **aprobado tras una corrección** · Lineage
+  `review-50066d1cb496ceb3`, 5 archivos y 947 líneas.
+- **El refuter encontró lo que los tests no**: tres hallazgos **CRITICAL** (`R4-001`, `R4-002`,
+  `R4-003`) con la misma causa — los nodos HTTP de los tres flujos no tenían reintento ni rama de
+  error, así que un fallo de red detenía el flujo **en silencio**. El test estructural no lo veía
+  porque no comprobaba esa política de ejecución.
+- **Corrección acotada** (plan declarado en 192 líneas, dentro del tope de 200): cada nodo HTTP pasa
+  a `retryOnFail` con 3 intentos y 5 s de espera, y `onError: continueErrorOutput`, con la salida de
+  error conectada al nodo de aviso que **ya existía** en cada flujo. Se añadió un test que falla si
+  un flujo pierde esos ajustes o si la rama de error apunta a un nodo inexistente.
+- La corrección la validó el **validador dirigido** del proveedor: **aprobada** con un aviso
+  informativo (`R4-004`, `n8n/F1_facturas_email.json:54`).
+- **Proceso**: el plan de corrección se declara **antes** de aplicarlo; mi primer intento lo hizo al
+  revés y el binding quedó atado a la revisión previa. Se resolvió volviendo temporalmente al estado
+  anterior, declarando el plan y retomando la corrección ya commiteada.
+- **Lo que esta feature deja claro**: `resilience` en flujos de orquestación no es decorativa. Los
+  tests de estructura dicen que el cableado es coherente; solo una lente de resiliencia dice si el
+  flujo se cae en silencio cuando la API no responde.
