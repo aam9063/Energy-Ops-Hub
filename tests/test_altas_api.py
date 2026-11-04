@@ -66,7 +66,8 @@ def _crear_clientes() -> None:
 
 def _fila(**extra: Any) -> dict[str, Any]:
     valores: dict[str, Any] = {
-        "nif": NIF,
+        "fila": 2,
+        "cliente_nif": NIF,
         "cups": CUPS_A,
         "tipo": "luz",
         "direccion": "Calle Falsa 123",
@@ -103,10 +104,10 @@ def test_lote_mixto_valida_fila_a_fila() -> None:
     _mock_hubspot_crea()
     cliente_http = TestClient(app)
     filas = [
-        _fila(),
-        _fila(cups=CUPS_MALO),
-        _fila(cups=CUPS_B, tipo="viento"),
-        _fila(cups=CUPS_B, tipo="gas", nif=NIF_SIN_EMPRESA),
+        _fila(fila=10),
+        _fila(fila=5, cups=CUPS_MALO),
+        _fila(fila=7, cups=CUPS_B, tipo="viento"),
+        _fila(fila=3, cups=CUPS_B, tipo="gas", cliente_nif=NIF_SIN_EMPRESA),
     ]
 
     respuesta = cliente_http.post("/altas/lote", json={"filas": filas})
@@ -120,7 +121,9 @@ def test_lote_mixto_valida_fila_a_fila() -> None:
         "errores": 3,
     }
     resultados = cuerpo["resultados"]
-    assert [r["fila"] for r in resultados] == [1, 2, 3, 4]
+    # Eco exacto: cada resultado devuelve el `fila` que mandó el cliente, aunque
+    # el lote venga desordenado.
+    assert [r["fila"] for r in resultados] == [10, 5, 7, 3]
     assert resultados[0]["ok"] is True
     assert resultados[0]["cups"] == CUPS_A
     assert resultados[0]["hubspot_deal_id"] == "1001"
@@ -161,7 +164,7 @@ def test_mismo_lote_dos_veces_no_duplica_nada() -> None:
         return_value=Response(200, json={"id": "1001"})
     )
     cliente_http = TestClient(app)
-    lote = {"filas": [_fila()]}
+    lote = {"filas": [_fila(fila=2)]}
 
     primera = cliente_http.post("/altas/lote", json=lote)
     segunda = cliente_http.post("/altas/lote", json=lote)
@@ -199,8 +202,8 @@ def test_cada_suministro_creado_guarda_su_deal_id() -> None:
     _mock_hubspot_crea()
     cliente_http = TestClient(app)
     filas = [
-        _fila(cups=CUPS_A, tipo="luz"),
-        _fila(cups=CUPS_B, tipo="gas", tarifa_acceso="3.0TD", potencia_kw=None),
+        _fila(fila=4, cups=CUPS_A, tipo="luz"),
+        _fila(fila=9, cups=CUPS_B, tipo="gas", tarifa_acceso="3.0TD", potencia_kw=None),
     ]
 
     respuesta = cliente_http.post("/altas/lote", json={"filas": filas})
@@ -228,3 +231,23 @@ def test_cada_suministro_creado_guarda_su_deal_id() -> None:
             )
             == 2
         )
+
+
+@respx.mock
+def test_alias_nif_aceptado_por_compatibilidad() -> None:
+    """`nif` sigue aceptándose como alias, aunque `cliente_nif` es el canónico."""
+    _crear_clientes()
+    _mock_hubspot_crea()
+    cliente_http = TestClient(app)
+    fila = _fila(fila=6)
+    fila["nif"] = fila.pop("cliente_nif")
+
+    respuesta = cliente_http.post("/altas/lote", json={"filas": [fila]})
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["resumen"] == {
+        "recibidas": 1,
+        "creadas": 1,
+        "actualizadas": 0,
+        "errores": 0,
+    }
