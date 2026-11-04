@@ -116,4 +116,16 @@ T10: revisión RDD del candidato, PR a `dev` y merge. Después, feature 02 (`02-
 
 ## RDD
 
-- (pendiente)
+- Riesgo: **medio** · Lente: `risk` (la que fija la tabla 19.4 para riesgo medio) · Resultado:
+  **aprobado sin correcciones** · Lineage `review-b7c930d42723b98d`, 30 archivos y 2240 líneas
+  revisadas sobre `dev`.
+- Avisos informativos del revisor, ninguno bloqueante y ninguno reabre esta revisión. Quedan como
+  trabajo posterior:
+  - `R1-alembic-concurrency` (`Dockerfile:23`): con más de una réplica, `alembic upgrade head` en
+    el arranque puede competir entre contenedores. En producción la migración va como paso previo
+    del despliegue, no en el `CMD`.
+  - `R1-predictable-api-key` (`docker-compose.yml:23`) y `R1-weak-db-creds` (`docker-compose.yml:6`):
+    credenciales de relleno, válidas solo en local; la plataforma de despliegue usa las suyas.
+  - `R1-n8n-weak-key` (`docker-compose.yml:34`): `N8N_ENCRYPTION_KEY` tiene un valor de relleno;
+    en producción es un secreto real.
+- Estos avisos se recogen también en la sección "Si esto fuera a producción" del README (feature 12).
