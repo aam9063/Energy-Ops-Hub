@@ -45,7 +45,7 @@ Cita literal de `docs/spec.md`, sección 11:
 - [x] T5 secretos en Script Properties (`API_URL`, `API_KEY`), nunca en el código
 - [x] T6 `appsscript.json` con los permisos mínimos y la zona horaria de Madrid
 - [x] T7 test de la lógica de CUPS ejecutable con `node`, y paso en el job `integrations` del CI
-- [ ] T8 verificación, evidencia, RDD (riesgo medio, una lente), PR y merge
+- [x] T8 verificación, evidencia, RDD, PR y merge
 
 ## Criterios de aceptación
 
@@ -114,4 +114,13 @@ F2 ya puede usar `GET /altas`.
 
 ## RDD
 
-- (pendiente)
+- Riesgo: **alto** (el proveedor detectó el shell nuevo del CI) · Lentes: **4R** · Resultado:
+  **aprobado** · Lineage `review-c945787518a9706d`, 9 archivos y 737 líneas.
+- El candidato ya venía corregido de dos hallazgos propios: el contrato de `POST /altas/lote` y la
+  falta de `GET /altas`. Esta revisión miró el conjunto ya alineado con la spec.
+- Cinco avisos informativos, ninguno bloqueante: tres sobre `app/routers/altas.py:144-177` y
+  `app/schemas.py:118-122` (validación y forma del lote), uno en `apps_script/Code.gs:173` y otro en
+  `app/routers/altas.py:144-176` sobre el endpoint nuevo. Quedan como trabajo posterior.
+- **Lección de proceso**: el worker paró dos veces antes de escribir una línea, porque la lista de
+  superficies es autoridad en su contrato y yo la había dejado desactualizada y luego con prosa
+  dentro del bloque. Parar fue lo correcto; la corrección era mía.
