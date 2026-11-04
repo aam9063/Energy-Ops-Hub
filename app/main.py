@@ -1,0 +1,86 @@
+"""Aplicación FastAPI: middleware de API key, `/health` y endpoints de facturas,
+anomalías, altas, sincronización con HubSpot y tareas programadas."""
+
+import logging
+import secrets
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, Response
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.types import ASGIApp
+
+from app.config import Settings, settings
+from app.db import engine
+from app.routers.altas import router as altas_router
+from app.routers.anomalias import router as anomalias_router
+from app.routers.facturas import router as facturas_router
+from app.routers.sync import router as sync_router
+from app.routers.tareas import router as tareas_router
+
+logger = logging.getLogger(__name__)
+
+# Rutas sin credenciales: el smoke test del despliegue y la documentación.
+RUTAS_PUBLICAS = frozenset({"/health", "/docs", "/redoc", "/openapi.json"})
+
+
+def database_ok() -> bool:
+    """True si la base de datos responde a una consulta trivial."""
+    try:
+        with engine.connect() as conexion:
+            conexion.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        logger.exception("La base de datos no responde")
+        return False
+    return True
+
+
+class ApiKeyMiddleware(BaseHTTPMiddleware):
+    """Exige la cabecera `X-API-Key`, salvo en las rutas públicas.
+
+    Si no hay `API_KEY` configurada la API queda abierta: es el modo local y de tests.
+    """
+
+    def __init__(self, app: ASGIApp, api_key: str) -> None:
+        super().__init__(app)
+        self.api_key = api_key
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        ruta = request.url.path
+        if not self.api_key or ruta in RUTAS_PUBLICAS or ruta.startswith("/docs"):
+            return await call_next(request)
+
+        recibida = request.headers.get("X-API-Key", "")
+        if not secrets.compare_digest(recibida, self.api_key):
+            return JSONResponse({"detail": "API key inválida o ausente"}, status_code=401)
+        return await call_next(request)
+
+
+def create_app(app_settings: Settings | None = None) -> FastAPI:
+    """Construye la aplicación. Recibe los ajustes para poder inyectarlos en los tests."""
+    configuracion = app_settings or settings
+    aplicacion = FastAPI(
+        title="Energy Ops Hub",
+        version="0.1.0",
+        summary="Automatización de operaciones energéticas para carteras inmobiliarias",
+    )
+    aplicacion.add_middleware(ApiKeyMiddleware, api_key=configuracion.api_key)
+    # El middleware de X-API-Key también protege /facturas, /anomalias, /altas, /sync y
+    # /tareas: no son rutas públicas.
+    aplicacion.include_router(facturas_router)
+    aplicacion.include_router(anomalias_router)
+    aplicacion.include_router(altas_router)
+    aplicacion.include_router(sync_router)
+    aplicacion.include_router(tareas_router)
+
+    @aplicacion.get("/health", tags=["sistema"])
+    def health() -> JSONResponse:
+        if database_ok():
+            return JSONResponse({"status": "ok", "database": "ok"})
+        return JSONResponse({"status": "degraded", "database": "error"}, status_code=503)
+
+    return aplicacion
+
+
+app = create_app()

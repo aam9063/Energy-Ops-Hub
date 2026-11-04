@@ -1,0 +1,187 @@
+{
+  "name": "F3 · Sincronización con HubSpot",
+  "active": false,
+  "nodes": [
+    {
+      "id": "77777777-aaaa-4a02-9a02-000000000001",
+      "name": "Nota del flujo F3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        -280
+      ],
+      "parameters": {
+        "content": "## F3 · Sincronización con HubSpot\nCada 15 minutos llama a `POST $vars.API_URL + /sync/hubspot` (sincronización incremental de fases). Si el resumen de la respuesta trae `errores > 0`, avisa por email. La lógica de sincronización y de idempotencia vive toda en Python; n8n solo dispara y avisa. Un error HTTP de la API rompe la ejecución y lo recoge el flujo de errores configurado en n8n.",
+        "height": 220,
+        "width": 520
+      }
+    },
+    {
+      "id": "77777777-aaaa-4a02-9a02-000000000002",
+      "name": "Nota · Credenciales y variables",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        -40
+      ],
+      "parameters": {
+        "content": "## Credenciales y variables\nEste flujo NO lleva credenciales embebidas: se configuran en n8n, no en este JSON. La autenticación con HubSpot vive en la API, no aquí.\n\nVariables de n8n (Settings → Variables): `API_URL`, `API_KEY`, `RESPONSABLE_EMAIL`.\n\nCredenciales: el nodo de Gmail que avisa usa la credencial de Gmail del remitente de operaciones; conéctala en n8n tras importar el flujo.",
+        "height": 220,
+        "width": 520
+      }
+    },
+    {
+      "id": "88888888-aaaa-4b02-9b02-000000000001",
+      "name": "Cada 15 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -380,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/15 * * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "88888888-aaaa-4b02-9b02-000000000002",
+      "name": "Sincronizar HubSpot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -160,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.API_URL }}/sync/hubspot",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $vars.API_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "88888888-aaaa-4b02-9b02-000000000003",
+      "name": "¿Sync con errores?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        60,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "99999999-aaaa-4c02-9c02-000000000001",
+              "leftValue": "={{ $json.errores > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "88888888-aaaa-4b02-9b02-000000000004",
+      "name": "Avisar del fallo de sincronización",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        280,
+        0
+      ],
+      "parameters": {
+        "sendTo": "={{ $vars.RESPONSABLE_EMAIL }}",
+        "subject": "Sync HubSpot con errores",
+        "emailType": "text",
+        "message": "=La sincronización con HubSpot ha terminado con errores.\n\nNegocios revisados: {{ $json.revisados }}\nActualizados: {{ $json.actualizados }}\nOmitidos: {{ $json.omitidos }}\nErrores: {{ $json.errores }}\n\nRevisa los logs de la API para el detalle.\n\n— Energy Ops Hub",
+        "options": {
+          "appendAttribution": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cada 15 minutos": {
+      "main": [
+        [
+          {
+            "node": "Sincronizar HubSpot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sincronizar HubSpot": {
+      "main": [
+        [
+          {
+            "node": "¿Sync con errores?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar del fallo de sincronización",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Sync con errores?": {
+      "main": [
+        [
+          {
+            "node": "Avisar del fallo de sincronización",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

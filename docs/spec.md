@@ -1222,7 +1222,7 @@ En el diagrama las ramas aparecen con guion (`feat-01-base`) por una limitación
 | `chore/`, `docs/`, `test/`, `refactor/`, `ci/` | `dev` | `dev` | Agente | Ninguna |
 | `hotfix/slug` | `main` | `main` y después `dev` | Tú en `main`, el agente en `dev` | Ninguna |
 
-`dev` es la rama por defecto del repositorio, así que los PRs apuntan ahí sin tener que pensarlo.
+`main` es la rama por defecto del repositorio, así que todo PR a `dev` se abre con `--base dev` de forma explícita.
 
 Por qué el merge a `main` lo haces tú: es la única puerta humana del flujo. Los agentes integran en `dev` sin preguntarte, y tú decides cuándo eso se convierte en una versión. Es el patrón habitual de un equipo: integración continua en `dev` y release controlada en `main`.
 
@@ -1877,7 +1877,7 @@ Cada fila es una feature ODD: un documento en `odd/tasks/`, una rama, un PR a `d
 
 | # | Documento ODD | Rama | Contenido | Riesgo RDD | Criterio de aceptación | Hito |
 |---|---|---|---|---|---|---|
-| 00 | (bootstrap, sin documento) | `main` y `dev` | Commit inicial con README mínimo, `AGENTS.md`, `docs/spec.md`, `.gitignore`, `.gitattributes` y `odd/tasks/` | No aplica | `main` y `dev` en GitHub, con `dev` como rama por defecto | |
+| 00 | (bootstrap, sin documento) | `main` y `dev` | Commit inicial con README mínimo, `AGENTS.md`, `docs/spec.md`, `.gitignore`, `.gitattributes` y `odd/tasks/` | No aplica | `main` y `dev` en GitHub, con `main` como rama por defecto | |
 | 01 | `01-base-proyecto` | `feat/01-base-proyecto` | pyproject con uv, estructura, config, modelos, Alembic, Docker Compose, Dockerfile, seed, validación de CUPS, `/health` y pre-commit | Medio | `docker compose up` levanta todo; tests de CUPS y de `/health` en verde | |
 | 02 | `02-pipeline-ci` | `ci/02-pipeline-ci` | `ci.yml`, `dependabot.yml`, plantilla de PR y, tras el merge, protección de `main` y `dev` | Alto | CI en verde en su propio PR; `ci-ok` obligatorio en `dev` y `main` | |
 | 03 | `03-datos-sinteticos` | `feat/03-datos-sinteticos` | Generador de PDFs con 3 maquetaciones y ground truth | Medio | 120 facturas con un 15 % de anomalías inyectadas, regenerables con una semilla fija | |
@@ -2093,7 +2093,7 @@ Mientras esperas, sigue con lo que no dependa de la respuesta.
 
 Ramas:
 - `main`: releases. Solo PR desde `dev` (o `hotfix/*`). El merge lo hace el humano.
-- `dev`: integración y rama por defecto. Solo por PR, con squash merge.
+- `dev`: integración. Solo por PR, con squash merge.
 - Ramas de trabajo desde `dev`: `feat/NN-slug`, `fix/slug`, `chore/slug`, `docs/slug`,
   `test/slug`, `refactor/slug`, `ci/NN-slug`. Slug en minúsculas, con guiones y sin acentos.
 - `hotfix/slug` solo desde `main` y solo si el humano lo pide.
@@ -2174,7 +2174,7 @@ La carpeta de trabajo contiene `proyecto-energy-ops-hub.md`. El remoto ya existe
    `.gitignore` y `.gitattributes` (docs/spec.md 20.8).
 7. `git add -A && git commit -m "chore: initial commit"` y `git push -u origin main`
 8. `git switch -c dev && git push -u origin dev`
-9. `gh repo edit --default-branch dev --delete-branch-on-merge --enable-squash-merge --enable-merge-commit --enable-rebase-merge=false`
+9. `gh repo edit --default-branch main --delete-branch-on-merge --enable-squash-merge --enable-merge-commit --enable-rebase-merge=false`
 10. Comprueba que RDD está activo (`/gentle:review-mode status`) e informa al humano.
 11. Continúa con la feature 01.
 
@@ -2295,7 +2295,7 @@ Solo si el núcleo está terminado y documentado.
 - [ ] Sección "Limitaciones" honesta y "Si esto fuera a producción".
 - [ ] El discurso de 2 minutos ensayado en voz alta.
 - [ ] Sin datos reales de nadie, sin secretos en el historial de git.
-- [ ] `main` y `dev` protegidas con `ci-ok` obligatorio; `dev` como rama por defecto.
+- [ ] `main` y `dev` protegidas con `ci-ok` obligatorio; `main` como rama por defecto.
 - [ ] Un documento ODD por feature en `odd/tasks/`, con evidencia y resultado RDD.
 - [ ] Historial de `dev` limpio: un commit Conventional por feature (squash).
 - [ ] Releases `v0.1.0`, `v0.2.0` y `v1.0.0` publicadas en `main` con notas generadas.

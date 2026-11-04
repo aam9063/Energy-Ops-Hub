@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy app scripts tests
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ops
+          POSTGRES_PASSWORD: ops
+          POSTGRES_DB: energy_ops_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ops"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://ops:ops@localhost:5432/energy_ops_test
+      API_KEY: ci-test-key
+      # Los tests nunca llaman a servicios reales: van simulados.
+      OPENAI_API_KEY: ci-dummy
+      HUBSPOT_TOKEN: ci-dummy
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Migraciones desde cero
+        run: uv run alembic upgrade head
+      - name: Tests con cobertura
+        run: uv run pytest --cov=app --cov-report=xml --cov-report=term --cov-fail-under=75
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: coverage
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  integrations:
+    name: integrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Los flujos de n8n son JSON válido
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for f in n8n/*.json; do jq empty "$f"; done
+      - name: Los flujos de n8n no llevan credenciales embebidas
+        shell: bash
+        run: |
+          if [ -d n8n ] && grep -RniE '"(apikey|api_key|token|password|secret)"[[:space:]]*:[[:space:]]*"[^"{=]' n8n/; then
+            echo "::error::Posible credencial dentro de un flujo de n8n exportado"
+            exit 1
+          fi
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Sintaxis de Apps Script
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for f in apps_script/*.gs; do
+            cp "$f" "/tmp/$(basename "$f" .gs).js"
+            node --check "/tmp/$(basename "$f" .gs).js"
+          done
+      - name: Test de CUPS de Apps Script
+        shell: bash
+        run: |
+          if [ -f apps_script/test_cups.js ]; then
+            node apps_script/test_cups.js
+          fi
+
+  secrets:
+    name: secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    name: docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [lint, test, integrations, secrets, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Fallar si algún job ha fallado o se ha cancelado
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - run: echo "CI OK"

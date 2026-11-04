@@ -1,0 +1,212 @@
+{
+  "name": "F2 · Altas paradas",
+  "active": false,
+  "nodes": [
+    {
+      "id": "44444444-aaaa-4d01-9d01-000000000001",
+      "name": "Nota del flujo F2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        -280
+      ],
+      "parameters": {
+        "content": "## F2 · Altas paradas\nCada día laborable a las 8:30 consulta `GET $vars.API_URL + /altas?parada_dias=7` (altas que llevan más de 7 días en el mismo estado). Si la lista viene vacía, termina sin avisar. Si hay altas, las agrupa por cliente con un nodo Code (solo formato, ninguna regla de negocio) y manda el resumen por email al equipo.",
+        "height": 220,
+        "width": 520
+      }
+    },
+    {
+      "id": "44444444-aaaa-4d01-9d01-000000000002",
+      "name": "Nota · Credenciales y variables",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        -40
+      ],
+      "parameters": {
+        "content": "## Credenciales y variables\nEste flujo NO lleva credenciales embebidas: se configuran en n8n, no en este JSON.\n\nVariables de n8n (Settings → Variables): `API_URL`, `API_KEY`, `RESPONSABLE_EMAIL`.\n\nCredenciales: el nodo de Gmail que envía el resumen usa la credencial de Gmail del remitente de operaciones; conéctala en n8n tras importar el flujo.",
+        "height": 220,
+        "width": 520
+      }
+    },
+    {
+      "id": "55555555-aaaa-4e01-9e01-000000000001",
+      "name": "Cada día laborable a las 8:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -380,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 8 * * 1-5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "55555555-aaaa-4e01-9e01-000000000002",
+      "name": "Consultar altas paradas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -160,
+        0
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.API_URL }}/altas?parada_dias=7",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $vars.API_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "55555555-aaaa-4e01-9e01-000000000003",
+      "name": "¿Hay altas paradas?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        60,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "66666666-aaaa-4f01-9f01-000000000001",
+              "leftValue": "={{ $items('Consultar altas paradas').first().json.cups }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "55555555-aaaa-4e01-9e01-000000000004",
+      "name": "Agrupar por cliente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Agrupa las altas paradas por cliente y monta un resumen legible para el equipo.\n// Esto es solo formato de presentación: ninguna regla de negocio vive en n8n.\nconst altas = $input.all().map((item) => item.json);\n\nconst porCliente = {};\nfor (const alta of altas) {\n  (porCliente[alta.cliente] ??= []).push(alta);\n}\n\nconst lineas = Object.entries(porCliente).map(([cliente, altasDeCliente]) => {\n  const detalle = altasDeCliente\n    .sort((a, b) => b.dias_parada - a.dias_parada)\n    .map(\n      (alta) =>\n        `  - CUPS ${alta.cups} · estado ${alta.estado} · ${alta.dias_parada} días parada`,\n    )\n    .join('\\n');\n  return `- ${cliente} (${altasDeCliente.length} alta(s) parada(s)):\\n${detalle}`;\n});\n\nconst clientes = Object.keys(porCliente).length;\nreturn [\n  {\n    json: {\n      total_altas: altas.length,\n      clientes_afectados: clientes,\n      resumen: `Hay ${altas.length} alta(s) parada(s) desde hace más de 7 días, en ${clientes} cliente(s):\\n\\n${lineas.join('\\n')}`,\n    },\n  },\n];"
+      }
+    },
+    {
+      "id": "55555555-aaaa-4e01-9e01-000000000005",
+      "name": "Enviar resumen al equipo",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        500,
+        0
+      ],
+      "parameters": {
+        "sendTo": "={{ $vars.RESPONSABLE_EMAIL }}",
+        "subject": "Altas paradas · resumen diario",
+        "emailType": "text",
+        "message": "={{ $json.resumen }}\n\n— Energy Ops Hub",
+        "options": {
+          "appendAttribution": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cada día laborable a las 8:30": {
+      "main": [
+        [
+          {
+            "node": "Consultar altas paradas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar altas paradas": {
+      "main": [
+        [
+          {
+            "node": "¿Hay altas paradas?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar resumen al equipo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay altas paradas?": {
+      "main": [
+        [
+          {
+            "node": "Agrupar por cliente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Agrupar por cliente": {
+      "main": [
+        [
+          {
+            "node": "Enviar resumen al equipo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
