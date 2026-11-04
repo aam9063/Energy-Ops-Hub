@@ -111,4 +111,14 @@ reales exigen `OPENAI_API_KEY` y el merge `dev`→`main` es del humano.
 
 ## RDD
 
-- (pendiente)
+- Riesgo: **alto** (el proveedor detectó el shell del workflow de evals) · Lente: `reliability` ·
+  Resultado: **aprobado** · Lineage `review-c1181bc69ff619ae`, 6 archivos y 1413 líneas.
+- **Antes de revisar hubo que arreglar el candidato**: la rama nació antes de que se mergeara el
+  `fix/` de ingesta, así que su diff contra `dev` incluía la **reversión** de esa corrección. Se
+  trajo `dev` a la rama, el candidato quedó en 6 archivos y se reinició la revisión. Sin ese paso,
+  el PR habría deshecho un arreglo ya integrado.
+- Cuatro avisos informativos, ninguno bloqueante y ninguno reabre esta revisión: dos sugerencias y
+  dos advertencias en `evals/run_evals.py` sobre el cálculo de precisión (línea 238), la lectura de
+  precios por variable de entorno (línea 396) y el informe (líneas 450-467). Quedan anotados como
+  trabajo posterior; el más útil, si algún día se toca el informe, es que la tabla diga siempre qué
+  precios se usaron.
