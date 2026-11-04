@@ -35,19 +35,19 @@ Cita literal de `docs/spec.md`, secciones 9 y 22:
 
 ## Checklist
 
-- [ ] T1 `FacturaExtraida` y esquemas de respuesta, copiados literalmente de la sección 9
-- [ ] T2 `openai_api_key` y `openai_model` en config y en `.env.example` (sustituyen a las de
+- [x] T1 `FacturaExtraida` y esquemas de respuesta, copiados literalmente de la sección 9
+- [x] T2 `openai_api_key` y `openai_model` en config y en `.env.example` (sustituyen a las de
   Anthropic, que no se usan)
-- [ ] T3 `extraer_factura` con `responses.parse(..., text_format=FacturaExtraida)` y el PDF como
+- [x] T3 `extraer_factura` con `responses.parse(..., text_format=FacturaExtraida)` y el PDF como
   `input_file`, con prompt que trata el documento como dato
-- [ ] T4 orquestación idempotente: `archivo_hash` y clave de negocio
+- [x] T4 orquestación idempotente: `archivo_hash` y clave de negocio
   `(cups_leido, numero, comercializadora)`
-- [ ] T5 `POST /facturas` (multipart) y `GET /facturas` con filtros `cups`, `cliente_nif`, `desde`,
+- [x] T5 `POST /facturas` (multipart) y `GET /facturas` con filtros `cups`, `cliente_nif`, `desde`,
   `hasta`
-- [ ] T6 política de revisión humana: confianza < 0,85 o `campos_dudosos` → anomalía R11
-- [ ] T7 tests sin red: cliente del LLM simulado, salida válida, salida inválida → 422, idempotencia
-- [ ] T8 test de integración con PostgreSQL real y PDF generado por la feature 03
-- [ ] T9 verificación, evidencia, RDD (riesgo alto, 4 lentes), PR
+- [x] T6 política de revisión humana: confianza < 0,85 o `campos_dudosos` → anomalía R11
+- [x] T7 tests sin red: cliente del LLM simulado, salida válida, salida inválida → 422, idempotencia
+- [x] T8 test de integración con PostgreSQL real y PDF generado por la feature 03
+- [x] T9 verificación, evidencia, RDD (riesgo alto, 4 lentes), PR
 
 ## Criterios de aceptación
 
@@ -60,15 +60,47 @@ Cita literal de `docs/spec.md`, secciones 9 y 22:
 
 ## Evidencia
 
-- (pendiente)
+- **Implementación**: la hizo un worker con este documento como contrato, en seis archivos
+  (`app/schemas.py`, `app/services/extraction.py`, `app/services/invoices.py`,
+  `app/routers/facturas.py`, `app/config.py`, `app/main.py`) y dos de tests.
+- **T1–T3**: `uv run pytest tests/test_extraction.py` → 8 tests, sin red: el cliente de OpenAI se
+  sustituye por un doble que guarda los kwargs. Comprueban que el PDF va como `input_file` con
+  `filename` y `file_data` en data URL base64, que `text_format is FacturaExtraida`, que el prompt
+  lleva la guarda anti-inyección, los metadatos de tokens, la salida no conforme → 
+  `ExtraccionInvalida`, la negativa del modelo y el PDF ilegible. Importar el módulo sin
+  `OPENAI_API_KEY` no falla: el cliente se crea perezosamente.
+- **T4–T5**: `uv run pytest tests/test_facturas_api.py` → 9 tests contra PostgreSQL real:
+  `test_mismo_pdf_no_duplica_nada` (segunda subida `creada=False`, **una sola llamada al LLM**, una
+  fila), `test_pdf_distinto_misma_clave_negocio_no_duplica`, `test_salida_invalida_da_422_y_no_guarda_nada`,
+  `test_confianza_baja_y_campos_dudosos_crea_r11`, `test_confianza_alta_sin_dudosos_no_crea_anomalia`,
+  `test_cups_fuera_de_cartera_guarda_suministro_nulo`, `test_archivo_no_pdf_da_422` y
+  `test_get_facturas_filtros` (incluida la normalización de CUPS).
+- **T6**: R11 se crea con confianza < 0,85 o `campos_dudosos`, con severidad `media` y detalle de los
+  motivos; la restricción `UNIQUE (factura_id, regla)` evita duplicarla.
+- **T9 verificación completa**: `uv run pytest` → `57 passed` · `uv run ruff check .` →
+  `All checks passed!` · `uv run ruff format --check .` → `28 files already formatted` ·
+  `uv run mypy app scripts tests` → `Success: no issues found in 23 source files` ·
+  cobertura de `app/`: `TOTAL 368 7 98%`.
+- **Dos huecos que encontró el orquestador al verificar y se cerraron aquí**:
+  1. Un periodo invertido que devolviera el modelo llegaba al `CHECK` de PostgreSQL y salía como
+     **500**. Ahora `FacturaExtraida` lo rechaza con un validador y el resultado es el 422 que pide
+     el criterio de aceptación; fijado con `test_un_periodo_invertido_es_una_extraccion_invalida`.
+  2. `.github/workflows/ci.yml` seguía exportando `ANTHROPIC_API_KEY: ci-dummy`. Sustituida por
+     `OPENAI_API_KEY`, que es la que el código lee.
+- **Verificación manual pendiente de la clave del humano**: la calidad real de la extracción sobre
+  los PDFs de las tres comercializadoras solo se puede medir con `OPENAI_API_KEY`. Es exactamente lo
+  que automatiza la feature 06, y hasta entonces el techo del sistema es «los tests y el esquema»,
+  no «la precisión medida».
 
 ## Progreso
 
 - 2026-11-04 documento creado antes del primer cambio de código.
+- 2026-11-04 T1–T8 implementados y verificados; T9 con los dos huecos cerrados.
+- 2026-11-04 commits por unidad de trabajo: esquema y cliente, ingesta idempotente, tests y CI.
 
 ## Siguiente paso
 
-T1: esquemas.
+T9: RDD de riesgo alto, PR a `dev` y merge. Después, feature 05 (`05-reglas-anomalias`).
 
 ## Git
 
@@ -83,7 +115,14 @@ T1: esquemas.
   `developers.openai.com`. El PDF viaja como `input_file` con `filename` y `file_data` en data URL
   base64.
 - `pdfplumber` entra aquí como apoyo: extraer el texto del PDF permite comprobaciones baratas y da
-  el campo de reserva si el modelo falla.
+  el campo de reserva si el modelo falla (se recortan a 8000 caracteres para no duplicar coste).
+- **`datos_crudos`** guarda la salida completa del modelo **y** una clave reservada `_extraccion`
+  con `modelo`, `tokens_entrada`, `tokens_salida` y `caracteres_texto`: cumple «se guardan
+  datos_crudos, modelo y tokens» sin añadir columnas al esquema de la sección 7.
+- **El commit lo hace el router**, no el servicio: así la fila de auditoría de `eventos_sync` entra
+  en la misma transacción y el 422 deja un evento `ok=False` en lugar de una transacción a medias.
+- **`ExtraccionInvalida` cubre tres casos** con el mismo 422: PDF ilegible, salida que no cumple el
+  esquema y negativa del modelo. Un 500 nunca es la respuesta correcta a un documento raro.
 
 ## RDD
 
