@@ -136,6 +136,10 @@ def cargar_registros(dataset: Path, limite: int | None) -> list[RegistroDataset]
                 archivo_hash=_sha256(ruta_pdf),
             )
         )
+    # La ingesta es cronológica: un duplicado llega *después* de la factura que duplica. El
+    # dataset se ordena alfabéticamente y «…-duplicada.pdf» cae antes que «….pdf», así que se
+    # empuja al final para que R3 lo vea contra su original ya procesado.
+    registros.sort(key=lambda registro: "-duplicada" in registro.pdf.name)
     if limite is not None:
         registros = registros[:limite]
     return registros
@@ -378,8 +382,8 @@ def evaluar_anomalias(
             a_factura_de_extraccion(
                 _con_comercializadora_canonica(anterior.verdad), anterior.archivo_hash
             )
-            for anterior in registros[:indice]
-            if normalizar_cups(anterior.verdad.cups) == cups
+            for posicion, anterior in enumerate(registros[:indice])
+            if posicion != indice and normalizar_cups(anterior.verdad.cups) == cups
         ]
         contexto = ContextoReglas(
             suministro=suministro,
@@ -701,7 +705,7 @@ def main(
         salidas = [float(str(meta.get("tokens_salida", 0))) for meta in metas]
         tokens_medios = (statistics.fmean(entradas), statistics.fmean(salidas))
         precios = tabla_de_precios()
-        if modelo in precios:
+        if precio_del_modelo(modelo, precios) is not None:
             costes: list[float] = []
             for tokens_entrada, tokens_salida in zip(entradas, salidas, strict=True):
                 coste = coste_de_factura(modelo, tokens_entrada, tokens_salida, precios)

@@ -555,3 +555,31 @@ def test_el_precio_se_encuentra_por_el_id_con_fecha() -> None:
 
     assert precio_del_modelo("gpt-4.1-mini-2025-04-14", precios) == precios["gpt-4.1-mini"]
     assert precio_del_modelo("modelo-inexistente", precios) is None
+
+
+def test_los_duplicados_se_procesan_despues_de_su_original(tmp_path: Path) -> None:
+    """Sin este orden, «…-duplicada.pdf» cae antes que «….pdf» y R3 nunca dispara."""
+    datos = {
+        "cups": "ES0021000000000001RK",
+        "numero_factura": "VOL-202601-000",
+        "comercializadora": "Voltia Energía",
+        "fecha_inicio": "2026-01-01",
+        "fecha_fin": "2026-01-31",
+        "consumo_kwh": 100.0,
+        "importe_total": 30.0,
+        "lectura_estimada": False,
+        "confianza": 0.9,
+        "campos_dudosos": [],
+        "anomalias_esperadas": [],
+        "tipo_anomalia": None,
+    }
+    for nombre in ("vol-202601-000-duplicada", "vol-202601-000"):
+        (tmp_path / f"{nombre}.json").write_text(json.dumps(datos), encoding="utf-8")
+        (tmp_path / f"{nombre}.pdf").write_bytes(b"%PDF-1.4 contenido")
+
+    registros = run_evals.cargar_registros(tmp_path, limite=None)
+
+    assert [registro.pdf.stem for registro in registros] == [
+        "vol-202601-000",
+        "vol-202601-000-duplicada",
+    ]
