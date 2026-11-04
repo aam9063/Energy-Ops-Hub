@@ -34,8 +34,8 @@ Cita literal de `docs/spec.md`, secciones 8 y 22:
 ## Alcance
 
 - **Dentro**: `scripts/generate_invoices.py` (Python + reportlab), la dependencia en el grupo
-  `dev`, el conjunto generado en `evals/dataset/` con un JSON de verdad esperada por PDF, y los
-  tests del generador.
+  `dev`, el conjunto generado en `evals/dataset/` (con un JSON de verdad esperada por PDF; **no se
+  versiona**, se regenera) y los tests del generador.
 - **Fuera**: llamar al LLM (feature 04), las reglas R1–R11 (feature 05), `run_evals.py` (feature
   06) y las capturas o gráficos del README.
 
@@ -90,7 +90,7 @@ Cita literal de `docs/spec.md`, secciones 8 y 22:
   ideal, que es el techo contra el que se mide la feature 06).
 - **T6 determinismo**: dos ejecuciones en directorios distintos dan **los 240 archivos idénticos
   byte a byte** (SHA-256 comparado por archivo).
-- **T7 tests**: `uv run pytest` → `41 passed` (10 del generador, 31 previos). `uv run ruff check .`
+- **T7 tests**: `uv run pytest` → `42 passed` (10 del generador, 31 previos). `uv run ruff check .`
   → `All checks passed!` · `uv run mypy app scripts tests` → `Success: no issues found in 17 source
   files` · cobertura de `app/` sin cambios: 97 %.
 - **Defecto encontrado en la verificación del orquestador y corregido**: la factura `duplicada`
@@ -100,6 +100,10 @@ Cita literal de `docs/spec.md`, secciones 8 y 22:
   emisión es de 2 a 6 días en las 120 facturas y hay dos tests que lo fijan
   (`test_la_duplicada_es_el_mismo_documento_que_su_original`,
   `test_las_fechas_de_emision_son_plausibles`).
+- **Dataset fuera de git**: tras la decisión, el árbol de trabajo lo conserva pero `git ls-files
+  evals/` no devuelve nada; el candidato de revisión baja de 245 archivos y 12 542 líneas a 6
+  archivos y ~1 150 líneas. Como la generación es determinista, el dataset es reproducible sin
+  versionarlo.
 
 ## Progreso
 
@@ -110,7 +114,8 @@ Cita literal de `docs/spec.md`, secciones 8 y 22:
 
 ## Siguiente paso
 
-T8: RDD de la feature, PR a `dev` y merge. Después, feature 04 (`04-extraccion-facturas`).
+T8: RDD de la feature (una lente, riesgo medio), PR a `dev` y merge. Después, feature 04
+(`04-extraccion-facturas`), que debe generar el dataset antes de medir nada.
 
 ## Git
 
@@ -137,6 +142,12 @@ T8: RDD de la feature, PR a `dev` y merge. Después, feature 04 (`04-extraccion-
   vez y aborta en cualquier invocación.
 - **`canvas.rl_config.invariant = 1`** fija la fecha de creación y el ID interno del PDF; es lo que
   permite que dos ejecuciones den archivos idénticos byte a byte.
+- **El dataset no se versiona** (decisión del humano, 2026-11-04). Son 240 archivos generados de
+  696 KB: la primera revisión RDD de esta feature **no se pudo ni crear** porque excedía el
+  presupuesto de contexto del revisor (`lens_context_budget_exceeded`). Al ser determinista, el
+  dataset es un producto de build: `evals/dataset/` está en `.gitignore` y quien lo necesita lo
+  regenera con `uv run python -m scripts.generate_invoices`. La feature 06 lo genera antes de
+  medir y la feature 12 lo documenta en el README.
 
 ## RDD
 
