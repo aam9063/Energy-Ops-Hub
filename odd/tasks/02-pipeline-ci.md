@@ -27,11 +27,11 @@ Cita literal de `docs/spec.md`, sección 22:
 
 ## Checklist
 
-- [ ] T1 `ci.yml` con `lint`, `test`, `integrations`, `secrets`, `docker` y `ci-ok`
-- [ ] T2 `dependabot.yml` (uv, github-actions y docker, contra `dev`)
-- [ ] T3 `.github/pull_request_template.md` con ODD y RDD
-- [ ] T4 tests de esquema que cubren `app/models.py` y llevan la cobertura por encima del 75 %
-- [ ] T5 validación local: hooks de YAML, cobertura y `actionlint` si está disponible
+- [x] T1 `ci.yml` con `lint`, `test`, `integrations`, `secrets`, `docker` y `ci-ok`
+- [x] T2 `dependabot.yml` (uv, github-actions y docker, contra `dev`)
+- [x] T3 `.github/pull_request_template.md` con ODD y RDD
+- [x] T4 tests de esquema que cubren `app/models.py` y llevan la cobertura por encima del 75 %
+- [x] T5 validación local: hooks de YAML, cobertura y `actionlint` si está disponible
 - [ ] T6 push y CI en verde en el propio PR
 - [ ] T7 squash merge a `dev`
 - [ ] T8 protección de `main` y `dev` con `ci-ok` obligatorio, y verificación
@@ -46,7 +46,16 @@ Cita literal de `docs/spec.md`, sección 22:
 
 ## Evidencia
 
-- (pendiente)
+- **T1** `push` de `.github/workflows/ci.yml` aceptado por GitHub: el token tiene el scope
+  `workflow` (el `gh auth status` mostraba la caché anterior a `gh auth refresh`).
+  `pre-commit run --all-files` → `check yaml ... Passed` sobre el workflow y `dependabot.yml`.
+- **T4** Antes de esta feature la cobertura era del 50 % con `app/models.py` al 0 %, así que el
+  umbral del 75 % habría fallado. Con `tests/test_schema.py`:
+  `uv run pytest --cov=app` → `31 passed`, `TOTAL 157 5 97%`, `app/models.py 73 0 100%`.
+- **T5** `uv run ruff check .` → `All checks passed!` · `uv run mypy app scripts tests` →
+  `Success: no issues found in 15 source files` · `actionlint` **no está instalado** en la máquina,
+  así que la validación estructural del workflow la hace GitHub al ejecutarlo (y `check-yaml` en
+  local).
 
 ## Progreso
 
@@ -63,7 +72,16 @@ T1: escribir `ci.yml`.
 
 ## Decisiones
 
-- (pendiente)
+- Versiones mayores de las acciones comprobadas con la API de GitHub el 2026-11-04 y fijadas por
+  tag mayor: `actions/checkout@v7`, `astral-sh/setup-uv@v10`, `actions/upload-artifact@v7`,
+  `docker/setup-buildx-action@v4`, `docker/build-push-action@v7`, `actions/setup-node@v7` y
+  `gitleaks/gitleaks-action@v3`.
+- El umbral de cobertura se cumple con tests reales de esquema, no bajándolo ni excluyendo
+  `app/models.py` de la medición.
+- Los tests de esquema escriben dentro de una transacción que se revierte, así que no dejan datos
+  ni necesitan una base dedicada por test.
+- Los jobs de n8n y Apps Script toleran que las carpetas no existan todavía: el CI se escribe una
+  vez y no hay que tocarlo en cada feature.
 
 ## RDD
 
