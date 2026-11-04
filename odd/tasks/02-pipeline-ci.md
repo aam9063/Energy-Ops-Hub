@@ -32,7 +32,7 @@ Cita literal de `docs/spec.md`, sección 22:
 - [x] T3 `.github/pull_request_template.md` con ODD y RDD
 - [x] T4 tests de esquema que cubren `app/models.py` y llevan la cobertura por encima del 75 %
 - [x] T5 validación local: hooks de YAML, cobertura y `actionlint` si está disponible
-- [ ] T6 push y CI en verde en el propio PR
+- [x] T6 push y CI en verde en el propio PR
 - [ ] T7 squash merge a `dev`
 - [ ] T8 protección de `main` y `dev` con `ci-ok` obligatorio, y verificación
 
@@ -56,6 +56,10 @@ Cita literal de `docs/spec.md`, sección 22:
   `Success: no issues found in 15 source files` · `actionlint` **no está instalado** en la máquina,
   así que la validación estructural del workflow la hace GitHub al ejecutarlo (y `check-yaml` en
   local).
+- **T6** Primer intento del PR: `lint` y `test` fallaban en 2–3 s con
+  `Unable to resolve action astral-sh/setup-uv@v10, unable to find version v10`. El proyecto solo
+  publica tags mayores hasta `v7` (comprobado con la API). Corregido en `fix(ci)`; segundo run:
+  `lint`, `test`, `integrations`, `secrets`, `docker` y `ci-ok` en `pass`.
 
 ## Progreso
 
@@ -85,4 +89,22 @@ T1: escribir `ci.yml`.
 
 ## RDD
 
-- (pendiente)
+- Riesgo: **alto** · Lentes: **4R** (`risk`, `resilience`, `readability`, `reliability`) ·
+  Resultado: **aprobado** · Lineage `review-5482413e3f709b30`, 5 archivos y 403 líneas sobre `dev`.
+- El revisor de `reliability` marcó un hallazgo **crítico** en `tests/test_schema.py:93-97`
+  (el test del `archivo_hash` no aislaría la restricción que dice probar). El **refuter lo refutó**
+  y quedó como no bloqueante: el segundo insert comparte `numero` distinto, así que la única
+  restricción que puede violar es `archivo_hash`.
+- Avisos informativos, ninguno bloqueante y ninguno reabre esta revisión. Quedan como trabajo
+  posterior:
+  - `R2-001` (`odd/tasks/02-pipeline-ci.md`): legibilidad de este documento.
+  - `R3-002` (`.github/workflows/ci.yml`, paso `upload-artifact`): el artefacto de cobertura se
+    sube con `if: always()`, incluso cuando el job falla antes de generarlo.
+  - `R4-001` (`.github/workflows/ci.yml`, job `docker`): caché `gha` compartida con el build de CD;
+    conviene separar `scope` cuando exista `cd.yml`.
+  - `R4-002` (`.github/workflows/ci.yml`, sintaxis de Apps Script): el bucle `node --check` copia a
+    `/tmp`; con nombres repetidos entre carpetas habría colisión.
+  - `R4-003` (`.github/workflows/ci.yml`, `concurrency`): `cancel-in-progress` cancela ejecuciones
+    del mismo `ref`; en `dev` puede dejar un run anterior a medias (es lo que se quiere, pero
+    conviene saberlo).
+- El merge incorpora este mismo registro; el código revisado no cambió después de la aprobación.
