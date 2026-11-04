@@ -82,7 +82,7 @@ Mientras esperas, sigue con lo que no dependa de la respuesta.
 
 Ramas:
 - `main`: releases. Solo PR desde `dev` (o `hotfix/*`). El merge lo hace el humano.
-- `dev`: integración y rama por defecto. Solo por PR, con squash merge.
+- `dev`: integración. Solo por PR, con squash merge.
 - Ramas de trabajo desde `dev`: `feat/NN-slug`, `fix/slug`, `chore/slug`, `docs/slug`,
   `test/slug`, `refactor/slug`, `ci/NN-slug`. Slug en minúsculas, con guiones y sin acentos.
 - `hotfix/slug` solo desde `main` y solo si el humano lo pide.
@@ -163,7 +163,7 @@ La carpeta de trabajo contiene `proyecto-energy-ops-hub.md`. El remoto ya existe
    `.gitignore` y `.gitattributes` (docs/spec.md 20.8).
 7. `git add -A && git commit -m "chore: initial commit"` y `git push -u origin main`
 8. `git switch -c dev && git push -u origin dev`
-9. `gh repo edit --default-branch dev --delete-branch-on-merge --enable-squash-merge --enable-merge-commit --enable-rebase-merge=false`
+9. `gh repo edit --default-branch main --delete-branch-on-merge --enable-squash-merge --enable-merge-commit --enable-rebase-merge=false`
 10. Comprueba que RDD está activo (`/gentle:review-mode status`) e informa al humano.
 11. Continúa con la feature 01.
 
