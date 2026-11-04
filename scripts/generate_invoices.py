@@ -196,6 +196,7 @@ class FacturaSintetica:
     importe_total: Decimal = Decimal("0.00")
     tipo_anomalia: str | None = None
     regla: str | None = None
+    reenvio: bool = False
 
 
 def _cups_fuera_de_cartera(indice: int) -> str:
@@ -337,6 +338,9 @@ def _aplicar_anomalia(
         original = plan[indice - indice % MESES]
         factura.numero = original.numero
         factura.slug = f"{original.numero.lower()}-duplicada"
+        # Un duplicado real es *otro archivo* con los mismos datos (un reenvío): si el PDF fuera
+        # byte a byte idéntico, su hash coincidiría y R3 no podría distinguirlo de la idempotencia.
+        factura.reenvio = True
         factura.fecha_emision = original.fecha_emision
         factura.fecha_inicio = original.fecha_inicio
         factura.fecha_fin = original.fecha_fin
@@ -660,7 +664,17 @@ def _escribir_pdf(ruta: Path, factura: FacturaSintetica, clientes: dict[str, str
         author=factura.comercializadora,
     )
     titular = clientes[str(factura.suministro["cliente_nif"])]
-    doc.build(PINTORES[factura.comercializadora](factura, titular))
+    historia = list(PINTORES[factura.comercializadora](factura, titular))
+    if factura.reenvio:
+        historia += [
+            Spacer(1, 10),
+            Paragraph(
+                "Reenvío: copia de una factura ya emitida, remitida de nuevo por la "
+                "comercializadora.",
+                _estilos()["estimada"],
+            ),
+        ]
+    doc.build(historia)
 
 
 def _verdad_esperada(f: FacturaSintetica) -> dict[str, object]:

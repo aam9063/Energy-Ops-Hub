@@ -136,6 +136,10 @@ def cargar_registros(dataset: Path, limite: int | None) -> list[RegistroDataset]
                 archivo_hash=_sha256(ruta_pdf),
             )
         )
+    # La ingesta es cronológica: un duplicado llega *después* de la factura que duplica. El
+    # dataset se ordena alfabéticamente y «…-duplicada.pdf» cae antes que «….pdf», así que se
+    # empuja al final para que R3 lo vea contra su original ya procesado.
+    registros.sort(key=lambda registro: "-duplicada" in registro.pdf.name)
     if limite is not None:
         registros = registros[:limite]
     return registros
@@ -192,9 +196,15 @@ def comparar_campo(campo: str, esperado: FacturaExtraida, extraido: FacturaExtra
     """
     if campo == "cups":
         return normalizar_cups(esperado.cups) == normalizar_cups(extraido.cups)
-    if campo in ("numero_factura", "comercializadora"):
-        return normalizar_texto(getattr(esperado, campo)) == normalizar_texto(
-            getattr(extraido, campo)
+    if campo == "numero_factura":
+        return normalizar_texto(esperado.numero_factura) == normalizar_texto(
+            extraido.numero_factura
+        )
+    if campo == "comercializadora":
+        # La factura dice «Voltia Energía, S.L.» y la cartera «Voltia Energía»: la forma
+        # jurídica y los acentos no identifican al proveedor, así que no cuentan como error.
+        return comercializadora_canonica(esperado.comercializadora) == comercializadora_canonica(
+            extraido.comercializadora
         )
     if campo == "periodo":
         return esperado.fecha_inicio == extraido.fecha_inicio and (
@@ -304,6 +314,26 @@ def _mediana_precio(
     return statistics.median(precios)
 
 
+def _con_comercializadora_canonica(datos: FacturaExtraida) -> FacturaExtraida:
+    """Copia la extracción con el nombre del proveedor en su forma canónica."""
+    return datos.model_copy(
+        update={"comercializadora": comercializadora_canonica(datos.comercializadora)}
+    )
+
+
+def precio_del_modelo(
+    modelo: str, precios: dict[str, tuple[float, float]]
+) -> tuple[float, float] | None:
+    """Precio del modelo por id exacto o, si no, por el id base sin la fecha de versión.
+
+    La API responde con `gpt-4.1-mini-2025-04-14` aunque se pida `gpt-4.1-mini`, y la tabla
+    de precios está por nombre comercial.
+    """
+    if modelo in precios:
+        return precios[modelo]
+    return precios.get(re.sub(r"-\d{4}-\d{2}-\d{2}.*$", "", modelo))
+
+
 def evaluar_anomalias(
     registros: list[RegistroDataset],
     extracciones: list[FacturaExtraida | None],
@@ -349,9 +379,11 @@ def evaluar_anomalias(
         cups = normalizar_cups(registro.verdad.cups)
         suministro = suministros.get(cups)
         anteriores = [
-            a_factura_de_extraccion(anterior.verdad, anterior.archivo_hash)
-            for anterior in registros[:indice]
-            if normalizar_cups(anterior.verdad.cups) == cups
+            a_factura_de_extraccion(
+                _con_comercializadora_canonica(anterior.verdad), anterior.archivo_hash
+            )
+            for posicion, anterior in enumerate(registros[:indice])
+            if posicion != indice and normalizar_cups(anterior.verdad.cups) == cups
         ]
         contexto = ContextoReglas(
             suministro=suministro,
@@ -363,7 +395,9 @@ def evaluar_anomalias(
                 else None
             ),
         )
-        factura = a_factura_de_extraccion(extraccion, registro.archivo_hash)
+        factura = a_factura_de_extraccion(
+            _con_comercializadora_canonica(extraccion), registro.archivo_hash
+        )
         obtenidas = {anomalia.regla for anomalia in evaluar(factura, contexto)}
 
         if (
@@ -412,7 +446,7 @@ def coste_de_factura(
     precios: dict[str, tuple[float, float]],
 ) -> float | None:
     """Coste estimado de una llamada con la tabla de precios; `None` si el modelo no está."""
-    precio = precios.get(modelo)
+    precio = precio_del_modelo(modelo, precios)
     if precio is None:
         return None
     return (tokens_entrada / 1_000_000) * precio[0] + (tokens_salida / 1_000_000) * precio[1]
@@ -671,7 +705,7 @@ def main(
         salidas = [float(str(meta.get("tokens_salida", 0))) for meta in metas]
         tokens_medios = (statistics.fmean(entradas), statistics.fmean(salidas))
         precios = tabla_de_precios()
-        if modelo in precios:
+        if precio_del_modelo(modelo, precios) is not None:
             costes: list[float] = []
             for tokens_entrada, tokens_salida in zip(entradas, salidas, strict=True):
                 coste = coste_de_factura(modelo, tokens_entrada, tokens_salida, precios)
