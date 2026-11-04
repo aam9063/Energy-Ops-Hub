@@ -44,13 +44,13 @@ Cita literal de `docs/spec.md`, sección 10:
 
 ## Checklist
 
-- [ ] T1 `app/domain/rules.py`: `Anomalia` y las reglas como funciones puras con su contexto
-- [ ] T2 R1–R9 y R11 evaluadas por factura con el histórico real del suministro
-- [ ] T3 R10 como tarea programada y `POST /tareas/sin-facturar`
-- [ ] T4 persistencia idempotente de las anomalías en la ingesta (una por regla y factura)
-- [ ] T5 `GET /anomalias` con filtros `estado`, `severidad`, `cups` y `PATCH /anomalias/{id}` para
+- [x] T1 `app/domain/rules.py`: `Anomalia` y las reglas como funciones puras con su contexto
+- [x] T2 R1–R9 y R11 evaluadas por factura con el histórico real del suministro
+- [x] T3 R10 como tarea programada y `POST /tareas/sin-facturar`
+- [x] T4 persistencia idempotente de las anomalías en la ingesta (una por regla y factura)
+- [x] T5 `GET /anomalias` con filtros `estado`, `severidad`, `cups` y `PATCH /anomalias/{id}` para
   resolver o descartar con comentario
-- [ ] T6 tests: cada regla con un caso que dispara y otro que no, y la evaluación conjunta
+- [x] T6 tests: cada regla con un caso que dispara y otro que no, y la evaluación conjunta
 - [ ] T7 verificación, evidencia, RDD (riesgo medio, una lente), PR y merge
 
 ## Criterios de aceptación
@@ -65,15 +65,39 @@ Cita literal de `docs/spec.md`, sección 10:
 
 ## Evidencia
 
-- (pendiente)
+- **Implementación**: un worker con este documento como contrato; el orquestador verificó después.
+- **T1 pureza**: `app/domain/rules.py` (360 líneas) sin `Session`, `select` ni `httpx`; todo el
+  I/O quedó en `app/services/rules.py` (261 líneas).
+- **T2/T6 reglas**: `uv run pytest tests/test_rules.py` → **31 tests** puros. Cada regla tiene su
+  caso que dispara y otro que no, más los bordes que fija la sección 10: R5 con desviación exacta
+  de 0,05 € y con un concepto ausente; R6 con 2 facturas de histórico (no dispara) y con 3;
+  R7 sin anterior; R8 con diferencia exacta de 0,01 kW; R9 justo en ±40 %; R10 a 59 y a 61 días;
+  `evaluar()` devolviendo `{R1, R2, R5, R11}` para una factura mala y `[]` para una limpia.
+- **R3 frente a R4**: dos tests dedicados comprueban que con la misma clave de negocio y el mismo
+  periodo **solo** dispara R3, y que con distinta clave y solape **solo** dispara R4.
+- **T3/T5 endpoints**: `uv run pytest tests/test_anomalias_api.py` → **16 tests** contra PostgreSQL
+  real: filtros y su 422 con `Literal`, `PATCH` resolviendo y descartando con comentario (404 si no
+  existe, 422 si el estado no vale), R10 con `POST /tareas/sin-facturar` y su idempotencia, y las
+  anomalías de la ingesta (R3, R5, R6) sin duplicarse al reprocesar.
+- **T7 verificación del orquestador sobre el merge ya resuelto**: `uv run pytest -q` → **105 passed** ·
+  `uv run ruff check .` → `All checks passed!` · `uv run mypy app scripts tests` →
+  `Success: no issues found in 29 source files` · cobertura de `app/`: `TOTAL 623 4 99%`, con
+  `domain/rules.py`, `services/rules.py`, `routers/anomalias.py` y `routers/tareas.py` al 100 %.
+- **Merge con `dev`**: el squash de la 04 en `dev` provocó conflictos en `app/main.py`,
+  `app/schemas.py` y `app/services/invoices.py` (contenido idéntico, historia distinta). Se resolvió
+  quedándose con el lado de la rama —que es 04 + los cambios de la 05— y se comprobó que el diff
+  contra `dev` es exactamente esta feature (10 archivos, 1846 líneas). `tests/conftest.py` no
+  aparece en el diff: quedó idéntico al de `dev`.
 
 ## Progreso
 
 - 2026-11-04 documento creado antes del primer cambio de código.
+- 2026-11-04 T1–T6 implementados y verificados; T7 pendiente de RDD y PR.
+- 2026-11-04 rama reconciliada con `dev` resolviendo los conflictos del squash de la 04.
 
 ## Siguiente paso
 
-T1: `app/domain/rules.py`.
+T7: RDD (riesgo medio, una lente), PR a `dev` y merge. Después, feature 06 (`06-evals`).
 
 ## Git
 
@@ -82,7 +106,24 @@ T1: `app/domain/rules.py`.
 
 ## Decisiones
 
-- (pendiente)
+- **R3 en la ruta del duplicado**: la `UNIQUE` de clave de negocio impide insertar la copia, así que
+  R3 solo puede dispararse reevaluando la factura **guardada** con la copia nueva como candidata
+  (`candidatas_extra`). La reevaluación es idempotente, así que no duplica el resto de reglas.
+- **R10 idempotente a mano**: cuelga del suministro, no de una factura, y `UNIQUE (factura_id,
+  regla)` no protege filas con `factura_id` NULL (NULL ≠ NULL). El servicio garantiza «como mucho
+  una R10 abierta por suministro», de modo que al resolverla puede volver a dispararse con
+  trazabilidad.
+- **R9 sin tarifa no dispara**: sin `tarifa_acceso` no hay mediana correcta que elegir, así que la
+  regla se abstiene en lugar de inventar una referencia.
+- **Comparaciones de dinero con `Decimal(str(x))`** en R5, R8 y R9: con `float`, los bordes exactos
+  (0,05 €, ±40 %, 0,01 kW) eran inestables y daban falsos negativos.
+- **Conocido y no resuelto aquí**: el PDF duplicado **no** deja su `archivo_hash`, porque no se
+  inserta fila. Volver a subir el mismo duplicado cuesta otra llamada al LLM (R3 ya está abierta y
+  no se duplica nada). Se deja anotado como siguiente paso: un registro de hashes vistos si el
+  volumen de duplicados lo justifica.
+- **`R10` usa `date.today()`** dentro de la función pura, que es lo que permite que el endpoint no
+  reciba la fecha. Los tests usan fechas relativas a hoy; si algún día se quiere congelar el
+  calendario, el parámetro ya existe (`dias`) y la fecha se puede inyectar.
 
 ## RDD
 
