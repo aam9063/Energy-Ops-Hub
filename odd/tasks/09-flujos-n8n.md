@@ -115,7 +115,12 @@ Cita literal de `docs/spec.md`, sección 13:
 - 2026-11-05 primer uso real en n8n: F1 no arrancaba por tres defectos de forma de datos y de
   contrato del endpoint. Corregido y fijado con tres tests que se vieron en rojo.
 - 2026-11-05 cuarto defecto (`downloadAttachments` fuera de `options`): el trigger no descargaba el
-  adjunto. Corregido y fijado con un cuarto test. El flujo sigue sin ejecutarse de punta a punta.
+  adjunto. Corregido y fijado con un cuarto test.
+- 2026-11-05 **ejecución real de punta a punta en n8n 2.46.6**: un correo con un PDF adjunto recorrió
+  los ocho nodos (`Workflow executed successfully`), la API respondió 200 y el flujo pidió el ticket.
+  La factura ya estaba ingerida, así que la API no duplicó nada y reutilizó el ticket existente: la
+  idempotencia funcionó en vivo. El tramo queda verificado con un caso real, no con estructura de
+  JSON.
 
 ## Siguiente paso
 
