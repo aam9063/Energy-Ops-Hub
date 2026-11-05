@@ -204,8 +204,10 @@ La especificación completa del producto y de la técnica está en
 - **Solo luz.** Gas y agua quedan como siguiente paso: el modelo es extensible, pero las
   reglas y el esquema se diseñaron para facturas eléctricas.
 - **Autenticación mínima**: una API key basta para la demo; no hay usuarios ni roles.
-- **Sin despliegue real ejecutado.** El CD (`cd.yml`, imagen en GHCR, deploy hook y smoke
-  test) está listo en el repo, pero falta elegir plataforma y configurar los secretos.
+- **Despliegue real en Render.** La API corre en
+  [energy-ops-hub-main.onrender.com](https://energy-ops-hub-main.onrender.com/health) con un
+  PostgreSQL gestionado, desplegada desde la imagen de GHCR por el CD. El plan Free de la base
+  caduca a los 30 días. No hay entorno de staging: `main` se despliega y `dev` no.
 - **Métricas de ahorro no medidas**: son estimaciones con supuestos; el primer paso real
   sería medir el proceso actual del equipo.
 - Siguientes pasos: feature 10 (copiloto), vídeo de demo, gas y agua, validación de consumos
