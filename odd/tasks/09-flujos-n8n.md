@@ -93,11 +93,27 @@ Cita literal de `docs/spec.md`, sección 13:
   es el nombre que usa el Gmail Trigger y hay que verificarlo contra la versión desplegada.
 - **Credenciales de Gmail**: las conecta el humano después de importar; el JSON no las lleva a
   propósito.
+- **Verificado al importar en n8n 2.46.6 (2026-11-05)**: el F1 real **no arrancaba**. Tres
+  defectos encadenados: (1) con `downloadAttachments` el Gmail Trigger entrega los adjuntos como
+  propiedades **binarias** (`attachment_0`, `attachment_1`…) y **no** crea un array `attachments`,
+  que es lo que consultaban el If (`$json.attachments.length > 0`) y el `splitOut`; el flujo se
+  cortaba en el segundo nodo con cualquier correo; (2) el multipart del POST mandaba el archivo como
+  `fichero` mientras la API declara `archivo: UploadFile = File(...)`, así que habría dado 422 aun
+  con adjunto; (3) al cambiar el `splitOut` hacía falta que el binario llegara al POST con un nombre
+  conocido. Arreglado: el If mira `$binary`, el `splitOut` pasó a un nodo **Code** que emite un ítem
+  por binario renombrado a `data`, y el formulario manda `archivo` leyendo `data`.
+  `tests/test_n8n_flows.py::TestAdjuntosDeF1` pina las tres cosas y los tres tests se observaron en
+  **rojo** contra el JSON anterior.
+- **Por qué escapó**: la lista de lo que no se podía verificar ya nombraba `attachment_0`; lo que
+  faltó fue un test que atara el nombre del campo multipart al del endpoint. Un aviso escrito no es
+  una verificación; un test sí.
 
 ## Progreso
 
 - 2026-11-05 documento creado antes del primer cambio de código.
 - 2026-11-05 T1–T5 implementados y verificados; T6 pendiente de RDD y PR.
+- 2026-11-05 primer uso real en n8n: F1 no arrancaba por tres defectos de forma de datos y de
+  contrato del endpoint. Corregido y fijado con tres tests que se vieron en rojo.
 
 ## Siguiente paso
 
