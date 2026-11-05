@@ -81,12 +81,27 @@ Cita literal de `docs/spec.md`, sección 11:
 - **Verificación del orquestador**: `uv run pytest` → **158 passed** · `uv run mypy app scripts
   tests evals` → `Success: no issues found in 41 source files` · `uv run ruff check .` → `All checks
   passed!` · cobertura de `app/`: `TOTAL 990 30 97%` · `node apps_script/test_cups.js` → `19/19`.
+- **El script no compilaba en Apps Script (2026-11-05)**: al pegarlo en la hoja, el editor devolvió
+  `ParseError: Unexpected token ILLEGAL, línea: 75`, que era `Number(BigInt(m[1]) % 529n)`. El
+  runtime V8 de Apps Script incluye `BigInt()`, pero **el parser del editor no admite la sintaxis de
+  literal** (`529n`): es una limitación documentada del editor, y no se ve en Node, que sí la acepta. Se sustituyó por `restoModulo_(digitos, 529)`, un módulo dígito a dígito que nunca
+  sale del rango seguro de `Number`.
+- **El fallo quedó cubierto por un test que sí corre en Node**: `apps_script/test_cups.js` falla si
+  `Code.gs` vuelve a usar un literal BigInt (ignorando comentarios) y añade dos casos de precisión:
+  `ES9999999999999999SA` es válido y `ES9999999999999999SG` no, porque la misma cuenta con `Number`
+  daría `SG`. `node apps_script/test_cups.js` → `21/21`, y `app/domain/cups.py` coincide en los
+  cuatro CUPS de control.
+- **Sin otras construcciones en riesgo**: `Code.gs` no usa `?.`, `??`, `.at(`, `flatMap`,
+  `replaceAll`, `fromEntries`, `padStart` ni `structuredClone`, así que no queda sintaxis que el
+  parser del editor pueda rechazar.
 
 ## Progreso
 
 - 2026-11-05 documento creado antes del primer cambio de código.
 - 2026-11-05 T1–T7 implementados por el worker; la alineación del contrato de altas y el endpoint
   `GET /altas` entraron en la misma entrega. Falta T8.
+- 2026-11-05 primer uso real en una hoja de Google: el script no compilaba por un literal BigInt.
+  Corregido y fijado con un test que corre en Node.
 
 ## Siguiente paso
 

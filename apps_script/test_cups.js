@@ -16,6 +16,23 @@ const vm = require('vm');
 
 const ruta = path.join(__dirname, 'Code.gs');
 const codigo = fs.readFileSync(ruta, 'utf8');
+
+// Apps Script rechaza los literales BigInt (`529n`) con "Unexpected token ILLEGAL"
+// aunque el runtime tenga `BigInt()`: el parser del editor no los admite. Este guard
+// convierte ese fallo, que sólo aparece al pegar el código en la hoja, en un test.
+const LITERAL_BIGINT = /\b\d+n\b/;
+const esComentario = (linea) => /^\s*(\/\/|\*|\/\*)/.test(linea);
+const culpable = codigo
+  .split('\n')
+  .findIndex((linea) => LITERAL_BIGINT.test(linea) && !esComentario(linea));
+if (culpable >= 0) {
+  console.error(
+    `FALLO: apps_script/Code.gs usa un literal BigInt en la línea ${culpable + 1}. ` +
+      'Apps Script lo rechaza con "Unexpected token ILLEGAL".'
+  );
+  process.exit(1);
+}
+
 const contexto = vm.createContext({ console });
 vm.runInContext(codigo + '\nthis.__cupsValido = cupsValido_;', contexto);
 const cupsValido = contexto.__cupsValido;
@@ -44,6 +61,8 @@ const CASOS = [
   ['ES003110284614000', false, 'menos de 16 dígitos'],
   ['ES00311028461400011', false, '17 dígitos, sin letras de control'],
   ['ES0031102846140001AK0F', true, 'formato exacto tras normalizar'],
+  ['ES9999999999999999SA', true, '16 dígitos por encima de 2^53: el módulo no pierde precisión'],
+  ['ES9999999999999999SG', false, 'la misma cuenta con Number daría otras letras de control'],
   [null, false, 'valor nulo'],
   [undefined, false, 'valor sin definir'],
 ];
