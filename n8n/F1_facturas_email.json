@@ -70,8 +70,9 @@
           "q": "has:attachment filename:pdf",
           "readStatus": "unread"
         },
-        "downloadAttachments": true,
-        "options": {}
+        "options": {
+          "downloadAttachments": true
+        }
       }
     },
     {

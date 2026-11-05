@@ -240,6 +240,19 @@ class TestAdjuntosDeF1:
             return
         raise AssertionError("F1 no tiene el nodo que sube la factura")
 
+    def test_el_trigger_descarga_los_adjuntos_donde_n8n_los_lee(self) -> None:
+        """`downloadAttachments` va dentro de `options`; en la raíz n8n lo ignora."""
+        triggers = [n for n in self._flujo()["nodes"] if n["type"].endswith("gmailTrigger")]
+        assert triggers, "F1 perdió el trigger de Gmail"
+        parametros = triggers[0]["parameters"]
+        assert "downloadAttachments" not in parametros, (
+            "`downloadAttachments` en la raíz de parameters no lo lee n8n: va dentro de `options`"
+        )
+        assert parametros["options"].get("downloadAttachments") is True, (
+            "Sin `options.downloadAttachments` el trigger no descarga el adjunto "
+            "y el If no ve binario"
+        )
+
     def test_el_nodo_code_entrega_el_binario_como_data(self) -> None:
         codigo = None
         for nodo in self._flujo()["nodes"]:
