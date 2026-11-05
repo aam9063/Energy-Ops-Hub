@@ -139,3 +139,11 @@ F2 ya puede usar `GET /altas`.
 - **Lección de proceso**: el worker paró dos veces antes de escribir una línea, porque la lista de
   superficies es autoridad en su contrato y yo la había dejado desactualizada y luego con prosa
   dentro del bloque. Parar fue lo correcto; la corrección era mía.
+- **Segunda revisión, del arreglo del BigInt (2026-11-05)**: riesgo **medio** (cambio ejecutable en
+  `apps_script/Code.gs`), lente `reliability`, 6 archivos y 127 líneas, lineage
+  `review-19a79f17b42e0a2d`. Resultado: **aprobado** y autoridad quemada.
+- **Defecto de proceso, anotado a propósito**: el commit del arreglo (`c999039`, PR #19) se mergeó
+  en `dev` **antes** de pasar esta revisión, aunque el cuerpo del PR declaraba riesgo medio y la
+  lente. La revisión se lanzó después, sobre el mismo candidato, y aprobó. Para un cambio de dominio
+  eso no es aceptable como rutina: el orden correcto es revisión, luego merge. Sí funcionó como red
+  de seguridad, que es mejor que nada.
