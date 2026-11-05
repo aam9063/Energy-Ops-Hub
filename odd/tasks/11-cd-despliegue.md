@@ -111,7 +111,7 @@ n8n y la grabaci√≥n de la demo con `docs/demo.md`. La release **v1.0.0** ya est√
 ## Git
 
 - Rama: `ci/11-cd-despliegue`
-- PR: (pendiente)
+- PR: #16
 
 ## Decisiones
 
