@@ -64,7 +64,7 @@
       "alwaysOutputData": true,
       "parameters": {
         "method": "GET",
-        "url": "={{ $vars.API_URL }}/altas?parada_dias=7",
+        "url": "={{ ($vars || {}).API_URL || 'http://api:8000' }}/altas?parada_dias=7",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

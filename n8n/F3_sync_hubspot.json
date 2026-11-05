@@ -63,7 +63,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $vars.API_URL }}/sync/hubspot",
+        "url": "={{ ($vars || {}).API_URL || 'http://api:8000' }}/sync/hubspot",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
