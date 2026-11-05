@@ -30,7 +30,9 @@ Cita literal de `docs/spec.md`, secciones 21.5 y 21.6:
   Script con clasp), `.github/workflows/release.yml` (etiquetas semver de la imagen) y
   `tests/test_workflows.py`, que valida en CI la política de entrega de los workflows.
 - **Fuera**: elegir la plataforma, crear los environments `production` y `evals` y cargar sus
-  secretos (lo hace el humano), y el primer despliegue real, que necesita lo anterior.
+  secretos (lo hace el humano), y el primer despliegue real, que necesita lo anterior. **Hecho el
+  2026-11-05**: plataforma Render, environment `production` con sus dos valores y primer despliegue
+  verde; ver T6 en Evidencia.
 
 ## Checklist
 
@@ -40,7 +42,7 @@ Cita literal de `docs/spec.md`, secciones 21.5 y 21.6:
 - [x] T4 `tests/test_workflows.py`: YAML válido, permisos mínimos, disparadores correctos,
       environment `production`, smoke test presente y ningún secreto interpolado dentro de `run:`
 - [x] T5 `pyyaml` como dependencia de desarrollo explícita (no transitiva)
-- [ ] T6 verificación, evidencia, RDD (riesgo alto, 4 lentes), PR y merge
+- [x] T6 verificación, evidencia, RDD (riesgo alto, 4 lentes), PR y merge
 
 ## Criterios de aceptación
 
@@ -67,23 +69,49 @@ Cita literal de `docs/spec.md`, secciones 21.5 y 21.6:
   convierte la clave `on:` en el booleano `True` (YAML 1.1); el helper `disparadores()` lo maneja.
 - **Verificación**: `uv run pytest` → **199 passed** (20 de workflows) · `uv run mypy app scripts tests
   evals` → 43 archivos sin errores · `ruff check` y `ruff format --check` limpios · cobertura **97 %**.
-- **Lo que no se puede verificar aquí**: el primer despliegue real. Necesita que el humano elija
-  plataforma, cree el environment `production` y cargue `DEPLOY_HOOK_URL` y `API_PUBLIC_URL`.
+- **T6 · primer despliegue real (2026-11-05)**: plataforma **Render**, elegida por el humano.
+  Servicio `energy-ops-hub` en Frankfurt desplegando la imagen
+  `ghcr.io/aam9063/energy-ops-hub:main` desde GHCR (paquete público, sin credenciales de registro)
+  contra un Postgres 16 gestionado en el mismo proyecto y la misma región, para que funcione la red
+  interna. El contenedor arranca con `alembic upgrade head && uvicorn …` (spec §18), así que migra
+  solo: no hubo que configurar Pre-Deploy Command ni comando de Docker.
+- **T6 · environment `production`**: `DEPLOY_HOOK_URL` (secreto, lo cargó el humano con
+  `gh secret set`) y `API_PUBLIC_URL` = `https://energy-ops-hub-main.onrender.com` (variable). Por
+  spec §21.10, `DATABASE_URL`, `API_KEY`, `OPENAI_API_KEY` y las `HS_*` viven en las variables de
+  entorno de Render, no en GitHub.
+- **T6 · CD en verde**: `gh workflow run cd.yml` → run **42000252294**, con `image` publicando las
+  etiquetas SHA y `main`, `deploy` lanzando el hook y pasando el smoke test contra `/health` en 4 s,
+  y `apps-script` salteado por el gate `DEPLOY_APPS_SCRIPT`.
+- **T6 · el disparador por push a `main` ya estaba probado**: el run **41915056309**, generado por el
+  merge `dev`→`main` de la release v1.0.0, entró por el evento `push`, dejó `image` en verde y falló
+  sólo en `deploy` por el `DEPLOY_HOOK_URL` vacío. Con el secreto cargado, los mismos jobs pasan. Un
+  push directo a `main` no lo puede hacer un agente (AGENTS.md §3), así que la prueba del disparador
+  se compone de esos dos runs.
+- **T6 · smoke test manual previo**: `GET /health` → `{"status":"ok","database":"ok"}` con HTTP 200
+  en tres llamadas seguidas (0,10–0,19 s), lo que confirma además la migración aplicada y la
+  conexión por red interna.
+- **Deuda conocida**: el plan Free de PostgreSQL en Render caduca a los 30 días. El servicio y la URL
+  sobreviven, pero hay que recrear la base y volver a cargar `DATABASE_URL`.
 
 ## Progreso
 
 - 2026-11-05 documento creado antes del primer cambio de código.
 - 2026-11-05 T1–T5 implementados y verificados; T6 pendiente de RDD y PR.
+- 2026-11-05 RDD aprobado (4 lentes) y PR mergeado; quedaba el despliegue real, que depende del
+  humano.
+- 2026-11-05 T6 cerrado: Render elegido, environment `production` cargado y CD en verde
+  (run 42000252294). Feature completa.
 
 ## Siguiente paso
 
-T6: PR a `dev` y merge. Después, hito **v0.2.0** (merge `dev`→`main` y release, del humano) y la
-feature 12.
+No queda trabajo de repo en esta feature. Lo pendiente es del humano y vive en la sección 22.1 de la
+spec: credenciales de HubSpot, hoja de Google con `apps_script/Code.gs`, credenciales de Gmail en
+n8n y la grabación de la demo con `docs/demo.md`. La release **v1.0.0** ya está publicada.
 
 ## Git
 
 - Rama: `ci/11-cd-despliegue`
-- PR: (pendiente)
+- PR: #16
 
 ## Decisiones
 
