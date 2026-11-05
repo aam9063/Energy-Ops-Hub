@@ -92,12 +92,29 @@ Cita literal de `docs/spec.md`, sección 12:
   passed!` · cobertura de `app/`: `TOTAL 969 30 97%`.
 - **Sin red**: los 13 tests del worker y los 3 del orquestador usan `respx`; ninguna prueba sale a
   internet.
+- **Cuenta real configurada (2026-11-05)**: cuenta gratuita de HubSpot con credencial de **Service
+  Key** (ver Decisiones), las 7 propiedades personalizadas creadas por API (`deals`: `cups`,
+  `tipo_suministro`, `direccion_suministro`, `energy_ops_id`; `tickets`: `cups`, `regla_anomalia`,
+  `energy_ops_id`) y el pipeline de negocios renombrado a «Altas de suministro» con las fases
+  *Pendiente documentación*, *En trámite*, *Activo* y *Rechazado*; `Cerrado Ganado` y
+  `Cerrado Perdido` se conservan porque borrarlas toca el forecasting del CRM y la app no las usa.
+- **Verificación contra el CRM real**: se creó una empresa, un negocio con las cuatro propiedades en
+  la fase pendiente y un ticket con sus tres propiedades, se leyeron los valores de vuelta y se
+  borraron los tres objetos (HTTP 204 en cada limpieza). El token, los scopes y los nombres técnicos
+  de las propiedades quedaron validados contra la API, no sólo contra `respx`.
+- **IDs reales leídos de `GET /crm/v3/pipelines/deals` y `/tickets`**:
+  `HS_PIPELINE_ALTAS=default`, `HS_STAGE_PENDIENTE=6366387424`, `HS_TICKET_PIPELINE=0`,
+  `HS_TICKET_STAGE_NUEVO=1`, y `HS_MAPA_ESTADOS={"6366387424":"pendiente","6366387425":"en_tramite",
+  "6366387426":"activo","6366387427":"rechazado"}`. Viven en las variables de entorno de la
+  plataforma de despliegue, nunca en el repositorio.
 
 ## Progreso
 
 - 2026-11-05 documento creado antes del primer cambio de código.
 - 2026-11-05 T1–T8 implementados por el worker y verificados por el orquestador.
 - 2026-11-05 hueco del ticket cerrado con tres tests de API; T9 pendiente de RDD y PR.
+- 2026-11-05 cuenta y credencial reales configuradas y validadas contra la API; diferencia con la
+  spec registrada en Decisiones.
 
 ## Siguiente paso
 
@@ -126,6 +143,17 @@ su `/altas/lote`).
 - **`creado` del ticket** es verdadero si no había `hubspot_ticket_id` local. Si el ticket ya existía
   en HubSpot pero el campo local estaba vacío, devuelve el id con `creado=True`: se prefirió no
   duplicar la búsqueda a afinar ese contador.
+- **La credencial es una Service Key, no una app privada.** La spec §12 pide una app privada, pero
+  HubSpot deshabilitó la creación de apps privadas legacy el **2026-10-26** y las reemplazó por
+  **Service Keys** de la Developer Platform, creadas desde `Desarrollo → Claves` o
+  `Ajustes → Integraciones → Service Keys`. Se consultó la documentación oficial el 2026-11-05:
+  <https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/account-service-keys>,
+  <https://developers.hubspot.com/docs/apps/legacy-apps/private-apps/overview> y el changelog
+  <https://developers.hubspot.com/changelog/legacy-private-app-creation-sunset>. La app no cambia: la
+  Service Key se usa igual, como `Authorization: Bearer <token>` contra `api.hubapi.com`. Se piden
+  los scopes `crm.schemas.deals.write` y `crm.schemas.tickets.write` además del mínimo de lectura de
+  esquemas de la spec, para poder crear las propiedades personalizadas por API en vez de a mano; el
+  código en producción sólo usa los de lectura.
 
 ## RDD
 
