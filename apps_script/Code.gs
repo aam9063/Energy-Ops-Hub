@@ -68,11 +68,24 @@ function normalizarCups_(cups) {
   return String(cups === null || cups === undefined ? '' : cups).replace(/\s+/g, '').toUpperCase();
 }
 
+/** Módulo de una cadena de dígitos, calculado dígito a dígito.
+ *
+ * 16 dígitos superan la precisión de Number y Apps Script no admite literales BigInt
+ * (`529n` da "Unexpected token ILLEGAL" al pegar el código en la hoja), así que el resto
+ * se acumula de izquierda a derecha sin salir nunca del rango seguro.
+ */
+function restoModulo_(digitos, modulo) {
+  let resto = 0;
+  for (let i = 0; i < digitos.length; i += 1) {
+    resto = (resto * 10 + (digitos.charCodeAt(i) - 48)) % modulo;
+  }
+  return resto;
+}
+
 function cupsValido_(cups) {
   const m = /^ES(\d{16})([A-Z]{2})(\d[A-Z])?$/.exec(normalizarCups_(cups));
   if (!m) return false;
-  // BigInt porque 16 dígitos superan la precisión de Number.
-  const resto = Number(BigInt(m[1]) % 529n);
+  const resto = restoModulo_(m[1], 529);
   return LETRAS[Math.floor(resto / 23)] + LETRAS[resto % 23] === m[2];
 }
 
