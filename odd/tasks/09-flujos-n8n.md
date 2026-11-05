@@ -93,11 +93,29 @@ Cita literal de `docs/spec.md`, sección 13:
   es el nombre que usa el Gmail Trigger y hay que verificarlo contra la versión desplegada.
 - **Credenciales de Gmail**: las conecta el humano después de importar; el JSON no las lleva a
   propósito.
+- **Verificado al importar en n8n 2.46.6 (2026-11-05)**: el F1 real **no arrancaba**. Tres
+  defectos encadenados: (1) con `downloadAttachments` el Gmail Trigger entrega los adjuntos como
+  propiedades **binarias** (`attachment_0`, `attachment_1`…) y **no** crea un array `attachments`,
+  que es lo que consultaban el If (`$json.attachments.length > 0`) y el `splitOut`; el flujo se
+  cortaba en el segundo nodo con cualquier correo; (2) el multipart del POST mandaba el archivo como
+  `fichero` mientras la API declara `archivo: UploadFile = File(...)`, así que habría dado 422 aun
+  con adjunto; (3) al cambiar el `splitOut` hacía falta que el binario llegara al POST con un nombre
+  conocido. Arreglado: el If mira `$binary`, el `splitOut` pasó a un nodo **Code** que emite un ítem
+  por binario renombrado a `data`, y el formulario manda `archivo` leyendo `data`.
+  `tests/test_n8n_flows.py::TestAdjuntosDeF1` pina las tres cosas y los tres tests se observaron en
+  **rojo** contra el JSON anterior.
+- **Por qué escapó**: la lista de lo que no se podía verificar ya nombraba `attachment_0`; lo que
+  faltó fue un test que atara el nombre del campo multipart al del endpoint. Un aviso escrito no es
+  una verificación; un test sí.
 
 ## Progreso
 
 - 2026-11-05 documento creado antes del primer cambio de código.
 - 2026-11-05 T1–T5 implementados y verificados; T6 pendiente de RDD y PR.
+- 2026-11-05 primer uso real en n8n: F1 no arrancaba por tres defectos de forma de datos y de
+  contrato del endpoint. Corregido y fijado con tres tests que se vieron en rojo.
+- 2026-11-05 cuarto defecto (`downloadAttachments` fuera de `options`): el trigger no descargaba el
+  adjunto. Corregido y fijado con un cuarto test. El flujo sigue sin ejecutarse de punta a punta.
 
 ## Siguiente paso
 
@@ -136,6 +154,20 @@ y release, del humano) y las features 11 y 12.
   un flujo pierde esos ajustes o si la rama de error apunta a un nodo inexistente.
 - La corrección la validó el **validador dirigido** del proveedor: **aprobada** con un aviso
   informativo (`R4-004`, `n8n/F1_facturas_email.json:54`).
+- **Segunda revisión, del arreglo de adjuntos (2026-11-05)**: riesgo **medio**, lente
+  `reliability`, lineage `review-ecbaf58342347174`. Resultado: **aprobada**. Tres avisos no
+  bloqueantes, todos informativos, que quedan como trabajo posterior: `R3-attribute-safety` y
+  `R3-batch-silence` (`n8n/F1_facturas_email.json:117`, atributos y silencio si un lote falla) y
+  `R3-test-fragility` (`tests/test_n8n_flows.py:230`, el test depende de nombres de nodo).
+- **Cuarto defecto del mismo flujo, encontrado después (2026-11-05)**: `downloadAttachments` estaba
+  en la raíz de `parameters` del trigger, pero en n8n 2.46 vive dentro de `options`. n8n lo
+  ignoraba, el trigger **nunca descargaba el adjunto**, no había binario y el If daba `false` con
+  cualquier correo. El arreglo anterior era correcto pero insuficiente: sin descarga, no hay nada
+  que inspeccionar. `TestAdjuntosdeF1` gana un test que exige `options.downloadAttachments`.
+- **Moraleja del ciclo**: los cuatro defectos eran invisibles sin ejecutar el flujo con un correo
+  real, y tres de ellos se descubrieron **en cadena**, uno detrás del otro. Es el costo de haber
+  cerrado la feature 09 sin poder probarla; el registro queda para que no se repita la decisión de
+  dar por buena una entrega que sólo se validó parseando JSON.
 - **Proceso**: el plan de corrección se declara **antes** de aplicarlo; mi primer intento lo hizo al
   revés y el binding quedó atado a la revisión previa. Se resolvió volviendo temporalmente al estado
   anterior, declarando el plan y retomando la corrección ya commiteada.

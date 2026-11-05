@@ -70,8 +70,9 @@
           "q": "has:attachment filename:pdf",
           "readStatus": "unread"
         },
-        "downloadAttachments": true,
-        "options": {}
+        "options": {
+          "downloadAttachments": true
+        }
       }
     },
     {
@@ -94,7 +95,7 @@
           "conditions": [
             {
               "id": "33333333-aaaa-4c01-9c01-000000000001",
-              "leftValue": "={{ $json.attachments.length > 0 }}",
+              "leftValue": "={{ Object.keys($binary || {}).length > 0 }}",
               "rightValue": "",
               "operator": {
                 "type": "boolean",
@@ -111,16 +112,14 @@
     {
       "id": "22222222-aaaa-4b01-9b01-000000000003",
       "name": "Un ítem por adjunto",
-      "type": "n8n-nodes-base.splitOut",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         -20,
         0
       ],
       "parameters": {
-        "fieldToSplitOut": "attachments",
-        "include": "noOtherFields",
-        "options": {}
+        "jsCode": "// El trigger de Gmail guarda cada adjunto como propiedad binaria\n// (attachment_0, attachment_1, ...). Aquí se emite un item por adjunto\n// con el binario renombrado a `data`, que es lo que consume el POST.\nconst binarios = (items[0].binary) || {};\nreturn Object.keys(binarios).map(function (clave) {\n  return {\n    json: { archivo: binarios[clave].fileName || clave },\n    binary: { data: binarios[clave] },\n  };\n});"
       }
     },
     {
@@ -150,8 +149,8 @@
           "parameters": [
             {
               "parameterType": "formBinaryData",
-              "name": "fichero",
-              "inputDataFieldName": "attachment_0"
+              "name": "archivo",
+              "inputDataFieldName": "data"
             }
           ]
         },
