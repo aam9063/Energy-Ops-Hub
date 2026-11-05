@@ -181,6 +181,31 @@ class TestEndpointsPorFlujo:
         codigo = codes[0]["parameters"]["jsCode"]
         assert "cliente" in codigo, "El Code debe agrupar por cliente"
 
+    def test_f2_termina_solo_cuando_no_hay_altas_paradas(self) -> None:
+        """Sin condicional: el Code emite cero ítems y el correo no corre (2026-11-05).
+
+        El If usaba `$items('Consultar altas paradas').first().json.cups`, que devolvía vacío
+        en n8n 2.46: el flujo se cortaba en silencio aunque hubiera altas paradas de 87 días.
+        """
+        flujo = json.loads(FLUJOS["F2_altas_paradas"].read_text(encoding="utf-8"))
+        condicionales = [n for n in flujo["nodes"] if n["type"].endswith(".if")]
+        assert not condicionales, (
+            "F2 no necesita condicional: el Code corta el flujo cuando la lista viene vacía"
+        )
+        codigo = next(n for n in flujo["nodes"] if n["type"].endswith(".code"))["parameters"][
+            "jsCode"
+        ]
+        assert "if (!items.length) return [];" in codigo, (
+            "El Code debe terminar sin items cuando no hay altas paradas"
+        )
+
+    def test_ningun_flujo_usa_el_accesor_fragil_items(self) -> None:
+        """`$items('nodo')` no es fiable: cortó F2 en silencio. Usar `$('nodo')` o el Code."""
+        for ruta in FLUJOS.values():
+            assert "$items(" not in ruta.read_text(encoding="utf-8"), (
+                f"{ruta.name} usa $items(), que devolvió vacío en n8n 2.46"
+            )
+
     def test_f3_sincroniza_hubspot_cada_15_minutos(self) -> None:
         texto = FLUJOS["F3_sync_hubspot"].read_text(encoding="utf-8")
         assert "/sync/hubspot" in texto

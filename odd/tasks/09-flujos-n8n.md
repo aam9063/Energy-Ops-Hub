@@ -173,6 +173,17 @@ y release, del humano) y las features 11 y 12.
   real, y tres de ellos se descubrieron **en cadena**, uno detrás del otro. Es el costo de haber
   cerrado la feature 09 sin poder probarla; el registro queda para que no se repita la decisión de
   dar por buena una entrega que sólo se validó parseando JSON.
+- **F2 se cortaba en silencio (2026-11-05)**: su condicional evaluaba
+  `$items('Consultar altas paradas').first().json.cups`, que en n8n 2.46.6 devuelve vacío, así que
+  mandaba **todo** por la rama `false` y el resumen diario no salía aunque hubiera altas paradas de
+  87 días. Se eliminó el condicional: el Code empieza con `if (!items.length) return [];` y el nodo
+  de correo simplemente no corre cuando la lista viene vacía. Un test falla si vuelve un nodo If en
+  F2 o si cualquier flujo usa `$items(`.
+- **Los tres flujos ejecutados en una instancia real (2026-11-05)**: F1 con un PDF adjunto hasta el
+  ticket; F2 enviando el resumen agrupado por cliente; F3 sincronizando con `errores: 0` y sin
+  avisar, que es lo correcto. En F3 se vio resolver
+  `{{ ($vars || {}).API_URL || 'http://api:8000' }}` a `http://api:8000/sync/hubspot`, así que el
+  fallback de portabilidad quedó probado en ejecución y no sólo en el test.
 - **Proceso**: el plan de corrección se declara **antes** de aplicarlo; mi primer intento lo hizo al
   revés y el binding quedó atado a la revisión previa. Se resolvió volviendo temporalmente al estado
   anterior, declarando el plan y retomando la corrección ya commiteada.
