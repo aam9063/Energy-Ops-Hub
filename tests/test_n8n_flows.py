@@ -184,7 +184,7 @@ class TestEndpointsPorFlujo:
             ("F1_facturas_email", "gmailTrigger", "gmail"),
             ("F2_altas_paradas", "scheduleTrigger", "schedule"),
             ("F3_sync_hubspot", "scheduleTrigger", "schedule"),
-            ("F1_facturas_email", "splitOut", "split"),
+            ("F1_facturas_email", "code", "code"),
             ("F1_facturas_email", "gmail", "gmail"),
             ("F2_altas_paradas", "gmail", "gmail"),
             ("F3_sync_hubspot", "gmail", "gmail"),
@@ -194,6 +194,66 @@ class TestEndpointsPorFlujo:
         flujo = json.loads(FLUJOS[clave].read_text(encoding="utf-8"))
         tipos = [nodo["type"] for nodo in flujo["nodes"]]
         assert any(tipo in t for t in tipos), f"{clave} no tiene ningún nodo {tipo!r}"
+
+
+class TestAdjuntosDeF1:
+    """El trigger de Gmail entrega binarios, no un array `attachments` (2026-11-05).
+
+    Con `downloadAttachments`, n8n 2.46.6 escribe cada adjunto en una propiedad binaria
+    (`attachment_0`, `attachment_1`, …) y **no** crea un campo `attachments` en el JSON. El
+    flujo original filtraba y dividía por ese campo, así que reventaba en el segundo nodo con
+    cualquier correo, y el POST habría dado 422 por mandar `fichero` donde la API espera
+    `archivo`. Estos tres tests pinan la forma real y el contrato del endpoint.
+    """
+
+    @staticmethod
+    def _flujo() -> dict[str, Any]:
+        documento: dict[str, Any] = json.loads(
+            FLUJOS["F1_facturas_email"].read_text(encoding="utf-8")
+        )
+        return documento
+
+    def test_el_filtro_mira_los_binarios_y_no_un_campo_attachments(self) -> None:
+        texto = json.dumps(self._flujo(), ensure_ascii=False)
+        assert "$json.attachments" not in texto, (
+            "F1 vuelve a leer `attachments`, que el trigger de Gmail no entrega"
+        )
+        ifs = [n for n in self._flujo()["nodes"] if n["type"].endswith(".if")]
+        assert ifs, "F1 perdió el nodo condicional"
+        condicion = ifs[0]["parameters"]["conditions"]["conditions"][0]["leftValue"]
+        assert "$binary" in condicion, f"El If debe mirar el binario, no {condicion!r}"
+
+    def test_el_archivo_viaja_en_el_campo_que_espera_la_api(self) -> None:
+        """El endpoint declara `archivo: UploadFile = File(...)`: otro nombre da 422."""
+        for nodo in self._flujo()["nodes"]:
+            if not nodo["type"].endswith("httpRequest"):
+                continue
+            if not str(nodo["parameters"].get("url", "")).endswith("/facturas"):
+                continue
+            parametros = nodo["parameters"]["bodyParameters"]["parameters"]
+            binarios = [p for p in parametros if p.get("parameterType") == "formBinaryData"]
+            assert binarios, f"{nodo['name']} no manda ningún archivo"
+            assert binarios[0]["name"] == "archivo", (
+                f"{nodo['name']} manda el archivo como {binarios[0]['name']!r}; "
+                "la API espera 'archivo'"
+            )
+            return
+        raise AssertionError("F1 no tiene el nodo que sube la factura")
+
+    def test_el_nodo_code_entrega_el_binario_como_data(self) -> None:
+        codigo = None
+        for nodo in self._flujo()["nodes"]:
+            if nodo["type"].endswith(".code"):
+                codigo = nodo["parameters"]["jsCode"]
+        assert codigo, "F1 perdió el nodo Code que separa los adjuntos"
+        assert "binary" in codigo, "El Code debe emitir el binario de cada adjunto"
+        assert "data" in codigo, "El Code debe renombrar el binario a `data`, que lee el POST"
+        for nodo in self._flujo()["nodes"]:
+            for parametro in nodo["parameters"].get("bodyParameters", {}).get("parameters", []):
+                if parametro.get("parameterType") == "formBinaryData":
+                    assert parametro["inputDataFieldName"] == "data", (
+                        "El POST debe leer la propiedad binaria que produce el Code"
+                    )
 
 
 @pytest.mark.parametrize("ruta", FLUJOS.values(), ids=lambda p: p.name)
