@@ -8,7 +8,7 @@ queden guardadas, consultables y resolubles por la API.
 ## Problema
 
 Una factura puede estar bien extraída y seguir siendo un problema: el total no cuadra, el consumo
-se dispara, es un duplicado, la potencia no es la contratada o el CUPS no está en cartera. Laura
+se dispara, es un duplicado, la potencia no es la contratada o el CUPS no está en cartera. Javier
 hoy lo detecta «a ojo». Las reglas convierten ese ojo en algo que se ejecuta siempre, igual y con
 un motivo escrito.
 

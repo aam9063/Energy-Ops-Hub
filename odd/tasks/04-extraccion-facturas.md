@@ -8,7 +8,7 @@ documento duplique nada.
 
 ## Problema
 
-Laura abre decenas de facturas en PDF de tres comercializadoras distintas y copia los datos a mano.
+Javier abre decenas de facturas en PDF de tres comercializadoras distintas y copia los datos a mano.
 El formato cambia entre comercializadoras, así que una plantilla fija no sirve: hace falta un
 modelo que lea el documento y devuelva un esquema fijo que el código pueda validar.
 

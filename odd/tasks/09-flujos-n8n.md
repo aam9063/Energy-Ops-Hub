@@ -115,7 +115,12 @@ Cita literal de `docs/spec.md`, sección 13:
 - 2026-11-05 primer uso real en n8n: F1 no arrancaba por tres defectos de forma de datos y de
   contrato del endpoint. Corregido y fijado con tres tests que se vieron en rojo.
 - 2026-11-05 cuarto defecto (`downloadAttachments` fuera de `options`): el trigger no descargaba el
-  adjunto. Corregido y fijado con un cuarto test. El flujo sigue sin ejecutarse de punta a punta.
+  adjunto. Corregido y fijado con un cuarto test.
+- 2026-11-05 **ejecución real de punta a punta en n8n 2.46.6**: un correo con un PDF adjunto recorrió
+  los ocho nodos (`Workflow executed successfully`), la API respondió 200 y el flujo pidió el ticket.
+  La factura ya estaba ingerida, así que la API no duplicó nada y reutilizó el ticket existente: la
+  idempotencia funcionó en vivo. El tramo queda verificado con un caso real, no con estructura de
+  JSON.
 
 ## Siguiente paso
 
@@ -168,9 +173,38 @@ y release, del humano) y las features 11 y 12.
   real, y tres de ellos se descubrieron **en cadena**, uno detrás del otro. Es el costo de haber
   cerrado la feature 09 sin poder probarla; el registro queda para que no se repita la decisión de
   dar por buena una entrega que sólo se validó parseando JSON.
+- **F2 se cortaba en silencio (2026-11-05)**: su condicional evaluaba
+  `$items('Consultar altas paradas').first().json.cups`, que en n8n 2.46.6 devuelve vacío, así que
+  mandaba **todo** por la rama `false` y el resumen diario no salía aunque hubiera altas paradas de
+  87 días. Se eliminó el condicional: el Code empieza con `if (!items.length) return [];` y el nodo
+  de correo simplemente no corre cuando la lista viene vacía. Un test falla si vuelve un nodo If en
+  F2 o si cualquier flujo usa `$items(`.
+- **Los tres flujos ejecutados en una instancia real (2026-11-05)**: F1 con un PDF adjunto hasta el
+  ticket; F2 enviando el resumen agrupado por cliente; F3 sincronizando con `errores: 0` y sin
+  avisar, que es lo correcto. En F3 se vio resolver
+  `{{ ($vars || {}).API_URL || 'http://api:8000' }}` a `http://api:8000/sync/hubspot`, así que el
+  fallback de portabilidad quedó probado en ejecución y no sólo en el test.
 - **Proceso**: el plan de corrección se declara **antes** de aplicarlo; mi primer intento lo hizo al
   revés y el binding quedó atado a la revisión previa. Se resolvió volviendo temporalmente al estado
   anterior, declarando el plan y retomando la corrección ya commiteada.
 - **Lo que esta feature deja claro**: `resilience` en flujos de orquestación no es decorativa. Los
   tests de estructura dicen que el cableado es coherente; solo una lente de resiliencia dice si el
   flujo se cae en silencio cuando la API no responde.
+
+## Revisión nativa incompleta (2026-11-06)
+
+El PR #26 (correo marcado como leído, fallback de URL, F2 sin condicional, tests de aislamiento)
+**no pudo completar la revisión nativa**: el revisor de la lente `reliability` capturó su resultado,
+pero el slot `provider_refuter` entró en un bucle — con `reviewerRunAcknowledged` responde
+`collectBinding is missing or stale for current STATUS` y sin él sólo devuelve el pronóstico otra vez.
+Tres intentos, ninguno mutó nada ni quemó autoridad; es un defecto del arnés, no del candidato.
+
+**El humano autorizó el merge sin esa revisión**, con el estado a la vista. Queda registrado acá por la
+misma razón que el resto de este documento: un registro que esconde una excepción no sirve. Lo que sí
+está verificado del candidato: los tres flujos ejecutados en una instancia real, 221 tests con la base
+sembrada y el CI del PR en verde.
+
+Además, sobre ese candidato se corrigió un defecto propio descubierto en la grabación: al insertar
+`markAsRead` **en la cadena principal**, el If de severidad dejó de ver la respuesta del POST y evaluó
+`false` con una anomalía R3 real en la base. Ahora el marcado cuelga en paralelo y un test exige que el
+If lea la respuesta de `/facturas`.

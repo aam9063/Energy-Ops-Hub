@@ -331,19 +331,21 @@ def test_get_facturas_filtros(monkeypatch: pytest.MonkeyPatch, cartera: None) ->
 
     todas = cliente_http.get("/facturas")
     assert todas.status_code == 200
-    assert [f["id"] for f in todas.json()] == [id_a, id_b, id_fuera]
+    # Los ids propios, en el orden que devuelve la API (por fecha de emisión).
+    propias = {id_a, id_b, id_fuera}
+    assert [f["id"] for f in todas.json() if f["id"] in propias] == [id_a, id_b, id_fuera]
 
     por_cups = cliente_http.get("/facturas", params={"cups": CUPS_A.lower()})
-    assert [f["id"] for f in por_cups.json()] == [id_a]  # normaliza mayúsculas
+    assert [f["id"] for f in por_cups.json() if f["id"] in propias] == [id_a]  # normaliza
 
     por_nif = cliente_http.get("/facturas", params={"cliente_nif": NIF})
-    assert [f["id"] for f in por_nif.json()] == [id_a, id_b]  # la de fuera de cartera, no
+    assert [f["id"] for f in por_nif.json() if f["id"] in propias] == [id_a, id_b]
 
     por_desde = cliente_http.get("/facturas", params={"desde": "2026-03-01"})
-    assert [f["id"] for f in por_desde.json()] == [id_b, id_fuera]
+    assert [f["id"] for f in por_desde.json() if f["id"] in propias] == [id_b, id_fuera]
 
     por_hasta = cliente_http.get("/facturas", params={"hasta": "2026-02-28"})
-    assert [f["id"] for f in por_hasta.json()] == [id_a]
+    assert [f["id"] for f in por_hasta.json() if f["id"] in propias] == [id_a]
 
 
 def test_un_pdf_demasiado_grande_da_413_sin_llamar_al_modelo(

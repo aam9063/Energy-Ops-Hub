@@ -64,11 +64,14 @@ def crear_factura(sesion: Session, **extra: object) -> Factura:
 
 
 def test_cups_duplicado_se_rechaza(sesion: Session) -> None:
+    # CUPS válido fuera del rango que usa el seed: con la base sembrada, el de siempre ya
+    # existe y el test fallaba en la primera inserción en vez de en la segunda.
+    cups = "ES9000000000000001QT"
     cliente = crear_cliente(sesion)
-    crear_suministro(sesion, cliente, "ES0021000000000001RK")
+    crear_suministro(sesion, cliente, cups)
 
     with pytest.raises(IntegrityError):
-        crear_suministro(sesion, cliente, "ES0021000000000001RK")
+        crear_suministro(sesion, cliente, cups)
 
 
 @pytest.mark.parametrize("tipo", ["petroleo", "Luz", ""])
