@@ -190,3 +190,21 @@ y release, del humano) y las features 11 y 12.
 - **Lo que esta feature deja claro**: `resilience` en flujos de orquestación no es decorativa. Los
   tests de estructura dicen que el cableado es coherente; solo una lente de resiliencia dice si el
   flujo se cae en silencio cuando la API no responde.
+
+## Revisión nativa incompleta (2026-11-06)
+
+El PR #26 (correo marcado como leído, fallback de URL, F2 sin condicional, tests de aislamiento)
+**no pudo completar la revisión nativa**: el revisor de la lente `reliability` capturó su resultado,
+pero el slot `provider_refuter` entró en un bucle — con `reviewerRunAcknowledged` responde
+`collectBinding is missing or stale for current STATUS` y sin él sólo devuelve el pronóstico otra vez.
+Tres intentos, ninguno mutó nada ni quemó autoridad; es un defecto del arnés, no del candidato.
+
+**El humano autorizó el merge sin esa revisión**, con el estado a la vista. Queda registrado acá por la
+misma razón que el resto de este documento: un registro que esconde una excepción no sirve. Lo que sí
+está verificado del candidato: los tres flujos ejecutados en una instancia real, 221 tests con la base
+sembrada y el CI del PR en verde.
+
+Además, sobre ese candidato se corrigió un defecto propio descubierto en la grabación: al insertar
+`markAsRead` **en la cadena principal**, el If de severidad dejó de ver la respuesta del POST y evaluó
+`false` con una anomalía R3 real en la base. Ahora el marcado cuelga en paralelo y un test exige que el
+If lea la respuesta de `/facturas`.

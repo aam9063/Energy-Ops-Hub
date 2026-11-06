@@ -286,6 +286,34 @@ class TestAdjuntosDeF1:
             "y el If no ve binario"
         )
 
+    def test_el_if_de_severidad_conserva_la_respuesta_del_post(self) -> None:
+        """Marcar el correo es una rama lateral: si se interpone, el If pierde `anomalias`.
+
+        Al insertar `markAsRead` en la cadena principal, el If recibió el mensaje de Gmail en
+        lugar de la respuesta del POST y evaluó `false` con una anomalía R3 real en la base.
+        """
+        flujo = self._flujo()
+        condiciones = [
+            n
+            for n in flujo["nodes"]
+            if n["type"].endswith(".if")
+            and "severidad" in json.dumps(n["parameters"], ensure_ascii=False)
+        ]
+        assert condiciones, "F1 perdió el If de severidad"
+        if_node = condiciones[0]
+        origenes = [
+            nombre
+            for nombre, salidas in flujo["connections"].items()
+            if any(
+                conexion["node"] == if_node["name"] for rama in salidas["main"] for conexion in rama
+            )
+        ]
+        assert len(origenes) == 1, f"El If de severidad debe tener un solo origen: {origenes}"
+        origen = next(n for n in flujo["nodes"] if n["name"] == origenes[0])
+        assert str(origen["parameters"].get("url", "")).endswith("/facturas"), (
+            f"El If de severidad debe leer la respuesta del POST, no {origenes[0]!r}"
+        )
+
     def test_el_correo_se_marca_leido_despues_del_post(self) -> None:
         """n8n advierte que sin `markAsRead` el mismo correo puede reprocesarse.
 

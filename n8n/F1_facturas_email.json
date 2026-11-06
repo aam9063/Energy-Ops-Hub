@@ -300,6 +300,11 @@
       "main": [
         [
           {
+            "node": "¿Anomalía de severidad alta?",
+            "type": "main",
+            "index": 0
+          },
+          {
             "node": "Marcar email como leído",
             "type": "main",
             "index": 0
@@ -338,17 +343,6 @@
         [
           {
             "node": "Avisar al responsable",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Marcar email como leído": {
-      "main": [
-        [
-          {
-            "node": "¿Anomalía de severidad alta?",
             "type": "main",
             "index": 0
           }
