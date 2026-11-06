@@ -73,7 +73,7 @@ Así deberías contarlo en el README y en la entrevista. Empieza por el usuario,
 
 ### Usuario principal
 
-**Laura, del equipo de Operaciones (Vendor Management).** Gestiona los suministros de luz, gas y agua de varios clientes inmobiliarios: un build to rent con 200 viviendas, una cadena de oficinas y un operador logístico.
+**Javier, del equipo de Operaciones (Vendor Management).** Gestiona los suministros de luz, gas y agua de varios clientes inmobiliarios: un build to rent con 200 viviendas, una cadena de oficinas y un operador logístico.
 
 ### Su día a día (supuesto razonable, márcalo como tal)
 
@@ -90,7 +90,7 @@ Así deberías contarlo en el README y en la entrevista. Empieza por el usuario,
 | Errores en facturas que nadie detecta | Nº de anomalías detectadas; € en errores recuperados |
 | Altas rechazadas por datos malos | % de filas con error detectadas en la entrada |
 | Altas atascadas sin que nadie lo vea | Nº de altas paradas más de 7 días; tiempo medio de alta |
-| Interrupciones por preguntas | Preguntas resueltas por el copiloto sin intervención de Laura |
+| Interrupciones por preguntas | Preguntas resueltas por el copiloto sin intervención de Javier |
 
 > En el README di claramente que los datos son sintéticos y que las métricas de ahorro son estimaciones con supuestos explícitos. Ser honesto con eso es una señal de madurez, no una debilidad.
 
@@ -860,7 +860,7 @@ Ver sección 14.
 
 ## 14. Módulo F: copiloto de operaciones (agente)
 
-**Objetivo:** que Ventas o Atención al cliente puedan preguntar "¿cuánto ha pagado el cliente X este trimestre?" o "¿por qué está parada el alta del CUPS ES...?" sin interrumpir a Laura.
+**Objetivo:** que Ventas o Atención al cliente puedan preguntar "¿cuánto ha pagado el cliente X este trimestre?" o "¿por qué está parada el alta del CUPS ES...?" sin interrumpir a Javier.
 
 ### Diseño
 
@@ -1103,7 +1103,7 @@ Plantilla. Las ocho primeras secciones son las que define gentle-ai para el docu
 Una frase: qué resultado observable deja esta feature.
 
 ## Problema
-Por qué hace falta, en términos del usuario (Laura, Operaciones).
+Por qué hace falta, en términos del usuario (Javier, Operaciones).
 Cita literal de docs/spec.md, sección 9.
 
 ## Alcance
