@@ -81,7 +81,7 @@ guardados en nuestra base de datos. Reprocesar no duplica nada.
 
 ## Flujo de un alta
 
-1. Laura pega las filas en la hoja «Altas» de **Google Sheets** y usa el menú de Apps Script.
+1. Javier pega las filas en la hoja «Altas» de **Google Sheets** y usa el menú de Apps Script.
 2. «**Validar filas**» comprueba en la propia hoja el formato del CUPS, los campos obligatorios
    y los duplicados, y marca en rojo las filas con error y su motivo. Nada sale de la hoja sin
    pasar este paso.

@@ -10,7 +10,7 @@ Todos los datos del proyecto son **sintéticos** y todas las métricas de ahorro
 
 ## El problema (30 segundos)
 
-Laura gestiona los suministros de luz de varios clientes inmobiliarios: un build to rent con
+Javier gestiona los suministros de luz de varios clientes inmobiliarios: un build to rent con
 200 viviendas, una cadena de oficinas y un operador logístico. Su día a día:
 
 1. Le llegan por email **decenas de facturas en PDF** de varias comercializadoras, cada una con

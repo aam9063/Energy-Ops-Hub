@@ -9,7 +9,7 @@ nuestra base de datos.
 ## Problema
 
 El equipo vive en HubSpot: ahí ve los negocios, mueve fases y gestiona tickets. Si las altas y las
-anomalías solo existen en nuestra base de datos, Laura trabaja en dos sitios. Y si la sincronización
+anomalías solo existen en nuestra base de datos, Javier trabaja en dos sitios. Y si la sincronización
 no es idempotente, cada reintento duplica negocios y ensucia el CRM — que es justo el problema que
 la oferta llama «calidad de los datos».
 
