@@ -133,7 +133,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $vars.API_URL }}/facturas",
+        "url": "={{ ($vars || {}).API_URL || 'http://api:8000' }}/facturas",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -206,7 +206,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $vars.API_URL }}/anomalias/{{ $json.anomalias[0].id }}/ticket",
+        "url": "={{ ($vars || {}).API_URL || 'http://api:8000' }}/anomalias/{{ $json.anomalias[0].id }}/ticket",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -241,6 +241,24 @@
           "appendAttribution": false
         }
       }
+    },
+    {
+      "id": "8692f550-6d53-5b4a-9ce8-9432cdcb32ce",
+      "name": "Marcar email como leído",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        420,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "markAsRead",
+        "messageId": "={{ $('Recibir emails con facturas').item.json.id }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -283,6 +301,11 @@
         [
           {
             "node": "¿Anomalía de severidad alta?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Marcar email como leído",
             "type": "main",
             "index": 0
           }

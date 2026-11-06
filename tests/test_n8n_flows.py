@@ -130,17 +130,25 @@ class TestFormatoDeExportacion:
                 )
 
     def test_la_url_de_la_api_sale_de_variables_de_n8n(self, flujo: dict[str, Any]) -> None:
-        for cadena in _cadenas(flujo):
-            assert "http" not in cadena or "//" not in cadena, (
-                f"URL escrita a mano en el flujo (debe salir de $vars): {cadena[:60]}"
-            )
         peticiones = [
             nodo for nodo in flujo["nodes"] if nodo["type"] == "n8n-nodes-base.httpRequest"
         ]
         assert peticiones, "El flujo no llama a la API"
         for peticion in peticiones:
-            assert peticion["parameters"]["url"].startswith("={{ $vars."), (
-                f"{peticion['name']}: la URL debe ser una expresión con $vars"
+            url = peticion["parameters"]["url"]
+            assert "$vars" in url, f"{peticion['name']}: la URL debe salir de $vars, no {url[:60]}"
+            assert "API_URL" in url, f"{peticion['name']}: la URL debe usar API_URL, no {url[:60]}"
+            assert "http://api:8000" in url, (
+                f"{peticion['name']}: falta el fallback local para la edición Community, "
+                "donde $vars no existe"
+            )
+
+    def test_ninguna_url_literal_apunta_fuera_de_la_maquina(self, flujo: dict[str, Any]) -> None:
+        for cadena in _cadenas(flujo):
+            if "http://" not in cadena and "https://" not in cadena:
+                continue
+            assert "api:8000" in cadena or "localhost" in cadena, (
+                f"URL literal en el flujo: {cadena[:60]}"
             )
 
 
@@ -172,6 +180,31 @@ class TestEndpointsPorFlujo:
         assert len(codes) == 1, "F2 debe tener exactamente un nodo Code"
         codigo = codes[0]["parameters"]["jsCode"]
         assert "cliente" in codigo, "El Code debe agrupar por cliente"
+
+    def test_f2_termina_solo_cuando_no_hay_altas_paradas(self) -> None:
+        """Sin condicional: el Code emite cero ítems y el correo no corre (2026-11-05).
+
+        El If usaba `$items('Consultar altas paradas').first().json.cups`, que devolvía vacío
+        en n8n 2.46: el flujo se cortaba en silencio aunque hubiera altas paradas de 87 días.
+        """
+        flujo = json.loads(FLUJOS["F2_altas_paradas"].read_text(encoding="utf-8"))
+        condicionales = [n for n in flujo["nodes"] if n["type"].endswith(".if")]
+        assert not condicionales, (
+            "F2 no necesita condicional: el Code corta el flujo cuando la lista viene vacía"
+        )
+        codigo = next(n for n in flujo["nodes"] if n["type"].endswith(".code"))["parameters"][
+            "jsCode"
+        ]
+        assert "if (!items.length) return [];" in codigo, (
+            "El Code debe terminar sin items cuando no hay altas paradas"
+        )
+
+    def test_ningun_flujo_usa_el_accesor_fragil_items(self) -> None:
+        """`$items('nodo')` no es fiable: cortó F2 en silencio. Usar `$('nodo')` o el Code."""
+        for ruta in FLUJOS.values():
+            assert "$items(" not in ruta.read_text(encoding="utf-8"), (
+                f"{ruta.name} usa $items(), que devolvió vacío en n8n 2.46"
+            )
 
     def test_f3_sincroniza_hubspot_cada_15_minutos(self) -> None:
         texto = FLUJOS["F3_sync_hubspot"].read_text(encoding="utf-8")
@@ -251,6 +284,63 @@ class TestAdjuntosDeF1:
         assert parametros["options"].get("downloadAttachments") is True, (
             "Sin `options.downloadAttachments` el trigger no descarga el adjunto "
             "y el If no ve binario"
+        )
+
+    def test_el_if_de_severidad_conserva_la_respuesta_del_post(self) -> None:
+        """Marcar el correo es una rama lateral: si se interpone, el If pierde `anomalias`.
+
+        Al insertar `markAsRead` en la cadena principal, el If recibió el mensaje de Gmail en
+        lugar de la respuesta del POST y evaluó `false` con una anomalía R3 real en la base.
+        """
+        flujo = self._flujo()
+        condiciones = [
+            n
+            for n in flujo["nodes"]
+            if n["type"].endswith(".if")
+            and "severidad" in json.dumps(n["parameters"], ensure_ascii=False)
+        ]
+        assert condiciones, "F1 perdió el If de severidad"
+        if_node = condiciones[0]
+        origenes = [
+            nombre
+            for nombre, salidas in flujo["connections"].items()
+            if any(
+                conexion["node"] == if_node["name"] for rama in salidas["main"] for conexion in rama
+            )
+        ]
+        assert len(origenes) == 1, f"El If de severidad debe tener un solo origen: {origenes}"
+        origen = next(n for n in flujo["nodes"] if n["name"] == origenes[0])
+        assert str(origen["parameters"].get("url", "")).endswith("/facturas"), (
+            f"El If de severidad debe leer la respuesta del POST, no {origenes[0]!r}"
+        )
+
+    def test_el_correo_se_marca_leido_despues_del_post(self) -> None:
+        """n8n advierte que sin `markAsRead` el mismo correo puede reprocesarse.
+
+        El trigger deduplica por `lastTimeChecked`, pero los datos estáticos se pierden al
+        resetear un flujo: el paso es lo que garantiza que cada correo se trate una vez.
+        """
+        flujo = self._flujo()
+        leidos = [n for n in flujo["nodes"] if n["parameters"].get("operation") == "markAsRead"]
+        assert leidos, "F1 no marca el correo como leído después de procesarlo"
+        leido = leidos[0]
+        assert "Recibir emails con facturas" in leido["parameters"]["messageId"], (
+            "El mensaje a marcar debe ser el del trigger"
+        )
+        origen = [
+            nombre
+            for nombre, salidas in flujo["connections"].items()
+            if any(
+                conexion["node"] == leido["name"] for rama in salidas["main"] for conexion in rama
+            )
+        ]
+        assert any(
+            "/facturas" in str(n["parameters"].get("url", ""))
+            for n in flujo["nodes"]
+            if n["name"] in origen
+        ), f"El correo debe marcarse después del POST, no antes: viene de {origen}"
+        assert leido.get("onError") == "continueRegularOutput", (
+            "Un fallo al marcar no puede tumbar la ingesta: la API es idempotente"
         )
 
     def test_el_nodo_code_entrega_el_binario_como_data(self) -> None:

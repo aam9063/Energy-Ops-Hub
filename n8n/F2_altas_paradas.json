@@ -64,7 +64,7 @@
       "alwaysOutputData": true,
       "parameters": {
         "method": "GET",
-        "url": "={{ $vars.API_URL }}/altas?parada_dias=7",
+        "url": "={{ ($vars || {}).API_URL || 'http://api:8000' }}/altas?parada_dias=7",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -82,40 +82,6 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "55555555-aaaa-4e01-9e01-000000000003",
-      "name": "¿Hay altas paradas?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        60,
-        0
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "66666666-aaaa-4f01-9f01-000000000001",
-              "leftValue": "={{ $items('Consultar altas paradas').first().json.cups }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      }
-    },
-    {
       "id": "55555555-aaaa-4e01-9e01-000000000004",
       "name": "Agrupar por cliente",
       "type": "n8n-nodes-base.code",
@@ -125,7 +91,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "// Agrupa las altas paradas por cliente y monta un resumen legible para el equipo.\n// Esto es solo formato de presentación: ninguna regla de negocio vive en n8n.\nconst altas = $input.all().map((item) => item.json);\n\nconst porCliente = {};\nfor (const alta of altas) {\n  (porCliente[alta.cliente] ??= []).push(alta);\n}\n\nconst lineas = Object.entries(porCliente).map(([cliente, altasDeCliente]) => {\n  const detalle = altasDeCliente\n    .sort((a, b) => b.dias_parada - a.dias_parada)\n    .map(\n      (alta) =>\n        `  - CUPS ${alta.cups} · estado ${alta.estado} · ${alta.dias_parada} días parada`,\n    )\n    .join('\\n');\n  return `- ${cliente} (${altasDeCliente.length} alta(s) parada(s)):\\n${detalle}`;\n});\n\nconst clientes = Object.keys(porCliente).length;\nreturn [\n  {\n    json: {\n      total_altas: altas.length,\n      clientes_afectados: clientes,\n      resumen: `Hay ${altas.length} alta(s) parada(s) desde hace más de 7 días, en ${clientes} cliente(s):\\n\\n${lineas.join('\\n')}`,\n    },\n  },\n];"
+        "jsCode": "// Sin altas paradas el flujo termina solo: cero items y el nodo de correo no corre.\nif (!items.length) return [];\n\n// Agrupa las altas paradas por cliente y monta un resumen legible para el equipo.\n// Esto es solo formato de presentación: ninguna regla de negocio vive en n8n.\nconst altas = $input.all().map((item) => item.json);\n\nconst porCliente = {};\nfor (const alta of altas) {\n  (porCliente[alta.cliente] ??= []).push(alta);\n}\n\nconst lineas = Object.entries(porCliente).map(([cliente, altasDeCliente]) => {\n  const detalle = altasDeCliente\n    .sort((a, b) => b.dias_parada - a.dias_parada)\n    .map(\n      (alta) =>\n        `  - CUPS ${alta.cups} · estado ${alta.estado} · ${alta.dias_parada} días parada`,\n    )\n    .join('\\n');\n  return `- ${cliente} (${altasDeCliente.length} alta(s) parada(s)):\\n${detalle}`;\n});\n\nconst clientes = Object.keys(porCliente).length;\nreturn [\n  {\n    json: {\n      total_altas: altas.length,\n      clientes_afectados: clientes,\n      resumen: `Hay ${altas.length} alta(s) parada(s) desde hace más de 7 días, en ${clientes} cliente(s):\\n\\n${lineas.join('\\n')}`,\n    },\n  },\n];"
       }
     },
     {
@@ -164,7 +130,7 @@
       "main": [
         [
           {
-            "node": "¿Hay altas paradas?",
+            "node": "Agrupar por cliente",
             "type": "main",
             "index": 0
           }
@@ -176,18 +142,6 @@
             "index": 0
           }
         ]
-      ]
-    },
-    "¿Hay altas paradas?": {
-      "main": [
-        [
-          {
-            "node": "Agrupar por cliente",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
       ]
     },
     "Agrupar por cliente": {
