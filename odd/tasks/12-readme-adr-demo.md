@@ -77,7 +77,7 @@ y `dev`, y once features integradas con su documento ODD y su resultado RDD.
 
 ## Evidencia
 
-- **T1 README**: reescrito con la estructura de la sección 23. Abre con el problema de Laura y no
+- **T1 README**: reescrito con la estructura de la sección 23. Abre con el problema de Javier y no
   con la tecnología, y los números son los medidos: 7 campos al 100 %, recall 18/18, 10 falsas
   alarmas (9 de R5 por ruido de extracción y 1 de R11), 0,0007 € por factura, **219 tests** y
   cobertura del **97 %** sobre `app/`. Las métricas de ahorro van como estimaciones con supuestos

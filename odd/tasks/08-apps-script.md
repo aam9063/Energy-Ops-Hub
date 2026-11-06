@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Que Laura pegue cincuenta viviendas nuevas en una hoja, pulse un menú y sepa fila a fila qué está
+Que Javier pegue cincuenta viviendas nuevas en una hoja, pulse un menú y sepa fila a fila qué está
 mal antes de enviar nada, y que las altas válidas lleguen a la API en un solo lote idempotente.
 
 ## Problema
